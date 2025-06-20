@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # BurnDevice 服务器
+  burndevice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+        COMMIT: ${COMMIT:-unknown}
+        DATE: ${DATE:-unknown}
+    container_name: burndevice-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.example.yaml:/app/config/config.yaml:ro
+      - burndevice-data:/app/data
+      - burndevice-logs:/app/logs
+    environment:
+      - BURNDEVICE_LOG_LEVEL=debug
+      - BURNDEVICE_SERVER_HOST=0.0.0.0
+      - BURNDEVICE_SERVER_PORT=8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "burndevice", "client", "system-info", "--server", "localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - burndevice-network
+
+  # 用于测试的客户端容器
+  burndevice-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+        COMMIT: ${COMMIT:-unknown}
+        DATE: ${DATE:-unknown}
+    container_name: burndevice-client
+    depends_on:
+      burndevice:
+        condition: service_healthy
+    volumes:
+      - ./config.example.yaml:/app/config/config.yaml:ro
+    environment:
+      - BURNDEVICE_SERVER_ADDRESS=burndevice:8080
+    command: ["burndevice", "client", "system-info", "--server", "burndevice:8080"]
+    networks:
+      - burndevice-network
+    profiles:
+      - testing
+
+  # 监控和日志收集（可选）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: burndevice-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - burndevice-network
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: burndevice-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - burndevice-network
+    profiles:
+      - monitoring
+
+volumes:
+  burndevice-data:
+    driver: local
+  burndevice-logs:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  burndevice-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

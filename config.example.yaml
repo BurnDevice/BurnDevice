@@ -1,0 +1,49 @@
+# BurnDevice Configuration Example
+# ⚠️ 警告：此配置仅用于授权的测试环境
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+ai:
+  provider: "deepseek"
+  api_key: "${BURNDEVICE_AI_API_KEY}"  # 从环境变量获取
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-chat"
+  max_tokens: 4096
+  temperature: 0.7
+  request_timeout: "30s"
+
+security:
+  require_confirmation: true
+  max_severity: "MEDIUM"  # LOW | MEDIUM | HIGH | CRITICAL
+  enable_safe_mode: true
+  audit_log: true
+  
+  # 允许的目标路径（白名单）
+  allowed_targets:
+    - "/tmp/burndevice_test"
+    - "/home/user/test"
+    - "C:\\Temp\\BurnDeviceTest"
+  
+  # 阻止的目标路径（黑名单）
+  blocked_targets:
+    - "/"
+    - "/bin"
+    - "/usr"
+    - "/etc"
+    - "/var"
+    - "/home"
+    - "/root"
+    - "C:\\Windows"
+    - "C:\\Program Files"
+    - "C:\\Users"
+    - "C:\\System32"
+
+log_level: "info"  # debug | info | warn | error 

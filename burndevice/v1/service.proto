@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package burndevice.v1;
+
+option go_package = "github.com/BurnDevice/BurnDevice/burndevice/v1;burndevicev1";
+
+import "google/protobuf/timestamp.proto";
+
+// BurnDevice service provides destructive testing capabilities
+service BurnDeviceService {
+  // Execute a destructive test scenario
+  rpc ExecuteDestruction(ExecuteDestructionRequest) returns (ExecuteDestructionResponse);
+  
+  // Get system information before destruction
+  rpc GetSystemInfo(GetSystemInfoRequest) returns (GetSystemInfoResponse);
+  
+  // Generate AI-powered attack scenarios
+  rpc GenerateAttackScenario(GenerateAttackScenarioRequest) returns (GenerateAttackScenarioResponse);
+  
+  // Stream destruction progress
+  rpc StreamDestruction(StreamDestructionRequest) returns (stream StreamDestructionResponse);
+}
+
+message ExecuteDestructionRequest {
+  DestructionType type = 1;
+  repeated string targets = 2;
+  DestructionSeverity severity = 3;
+  bool confirm_destruction = 4;
+  string ai_scenario_id = 5;
+}
+
+message ExecuteDestructionResponse {
+  bool success = 1;
+  string message = 2;
+  repeated DestructionResult results = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message StreamDestructionRequest {
+  DestructionType type = 1;
+  repeated string targets = 2;
+  DestructionSeverity severity = 3;
+  bool confirm_destruction = 4;
+  string ai_scenario_id = 5;
+}
+
+message StreamDestructionResponse {
+  google.protobuf.Timestamp timestamp = 1;
+  string message = 2;
+  DestructionEventType type = 3;
+  string target = 4;
+  double progress = 5;
+}
+
+message DestructionResult {
+  string target = 1;
+  bool success = 2;
+  string error_message = 3;
+  DestructionMetrics metrics = 4;
+}
+
+message DestructionMetrics {
+  int64 files_deleted = 1;
+  int64 bytes_destroyed = 2;
+  double execution_time_seconds = 3;
+}
+
+message GetSystemInfoRequest {}
+
+message GetSystemInfoResponse {
+  string os = 1;
+  string architecture = 2;
+  string hostname = 3;
+  repeated string critical_paths = 4;
+  repeated string running_services = 5;
+  SystemResources resources = 6;
+}
+
+message SystemResources {
+  int64 total_memory = 1;
+  int64 available_memory = 2;
+  int64 total_disk = 3;
+  int64 available_disk = 4;
+  double cpu_usage = 5;
+}
+
+message GenerateAttackScenarioRequest {
+  string target_description = 1;
+  DestructionSeverity max_severity = 2;
+  string ai_model = 3;
+}
+
+message GenerateAttackScenarioResponse {
+  string scenario_id = 1;
+  string description = 2;
+  repeated AttackStep steps = 3;
+  DestructionSeverity estimated_severity = 4;
+}
+
+message AttackStep {
+  int32 order = 1;
+  string description = 2;
+  DestructionType type = 3;
+  repeated string targets = 4;
+  string rationale = 5;
+}
+
+enum DestructionType {
+  DESTRUCTION_TYPE_UNSPECIFIED = 0;
+  DESTRUCTION_TYPE_FILE_DELETION = 1;
+  DESTRUCTION_TYPE_REGISTRY_CORRUPTION = 2;
+  DESTRUCTION_TYPE_SERVICE_TERMINATION = 3;
+  DESTRUCTION_TYPE_MEMORY_EXHAUSTION = 4;
+  DESTRUCTION_TYPE_DISK_FILL = 5;
+  DESTRUCTION_TYPE_NETWORK_DISRUPTION = 6;
+  DESTRUCTION_TYPE_BOOT_CORRUPTION = 7;
+  DESTRUCTION_TYPE_KERNEL_PANIC = 8;
+}
+
+enum DestructionSeverity {
+  DESTRUCTION_SEVERITY_UNSPECIFIED = 0;
+  DESTRUCTION_SEVERITY_LOW = 1;        // Recoverable
+  DESTRUCTION_SEVERITY_MEDIUM = 2;     // Requires manual intervention
+  DESTRUCTION_SEVERITY_HIGH = 3;       // System reinstall required
+  DESTRUCTION_SEVERITY_CRITICAL = 4;   // Hardware replacement may be needed
+}
+
+enum DestructionEventType {
+  DESTRUCTION_EVENT_TYPE_UNSPECIFIED = 0;
+  DESTRUCTION_EVENT_TYPE_STARTED = 1;
+  DESTRUCTION_EVENT_TYPE_PROGRESS = 2;
+  DESTRUCTION_EVENT_TYPE_COMPLETED = 3;
+  DESTRUCTION_EVENT_TYPE_ERROR = 4;
+  DESTRUCTION_EVENT_TYPE_WARNING = 5;
+} 
