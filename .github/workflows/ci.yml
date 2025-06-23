@@ -42,6 +42,11 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Install protoc plugins
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
     - name: Generate protobuf code
       run: buf generate
 
@@ -130,6 +135,11 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Install protoc plugins
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
     - name: Generate protobuf code
       run: buf generate
 
@@ -182,6 +192,11 @@ jobs:
 
     - name: Download dependencies
       run: go mod download
+
+    - name: Install protoc plugins
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
     - name: Generate protobuf code
       run: buf generate

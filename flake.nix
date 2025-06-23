@@ -32,6 +32,7 @@
             gnumake
             neovim
             nixfmt-rfc-style
+            gh
             # Security scanning tools
             gosec
             govulncheck
