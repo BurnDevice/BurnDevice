@@ -11,9 +11,15 @@ RUN apk add --no-cache \
     curl \
     unzip
 
-# Install buf
+# Install buf for the target architecture
 ARG BUF_VERSION=1.28.1
-RUN curl -sSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64" -o /usr/local/bin/buf && \
+ARG TARGETARCH
+RUN case ${TARGETARCH} in \
+        amd64) BUF_ARCH=x86_64 ;; \
+        arm64) BUF_ARCH=aarch_64 ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl -sSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-${BUF_ARCH}" -o /usr/local/bin/buf && \
     chmod +x /usr/local/bin/buf
 
 # Set working directory
