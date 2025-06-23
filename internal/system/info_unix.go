@@ -25,15 +25,15 @@ func (s *SystemInfo) getDiskInfo() (*DiskInfo, error) {
 
 	// Safe conversion with bounds checking to prevent integer overflow
 	// First check if values fit in int64 range
-	const maxInt64 = 1<<63 - 1
+	const maxInt64 = int64(1<<63 - 1)
 
-	if stat.Blocks > maxInt64 {
+	if int64(stat.Blocks) > maxInt64 {
 		return nil, fmt.Errorf("blocks value %d exceeds int64 maximum", stat.Blocks)
 	}
-	if stat.Bsize > maxInt64 {
+	if int64(stat.Bsize) > maxInt64 {
 		return nil, fmt.Errorf("block size value %d exceeds int64 maximum", stat.Bsize)
 	}
-	if stat.Bavail > maxInt64 {
+	if int64(stat.Bavail) > maxInt64 {
 		return nil, fmt.Errorf("available blocks value %d exceeds int64 maximum", stat.Bavail)
 	}
 
