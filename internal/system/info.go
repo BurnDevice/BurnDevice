@@ -466,8 +466,9 @@ func (s *SystemInfo) getLinuxCPUUsage() (float64, error) {
 
 	line := strings.TrimSpace(string(output))
 	fields := strings.Fields(line)
-	if len(fields) < 4 {
-		return 0.0, fmt.Errorf("invalid /proc/stat format")
+	// Need at least 5 fields: cpu, user, nice, system, idle (indices 0-4)
+	if len(fields) < 5 {
+		return 0.0, fmt.Errorf("invalid /proc/stat format: expected at least 5 fields, got %d", len(fields))
 	}
 
 	user, _ := strconv.ParseFloat(fields[1], 64)
