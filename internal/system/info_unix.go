@@ -24,28 +24,31 @@ func (s *SystemInfo) getDiskInfo() (*DiskInfo, error) {
 	}
 
 	// Safe conversion with bounds checking to prevent integer overflow
-	// First check if values fit in int64 range
-	const maxInt64 = int64(1<<63 - 1)
+	// Check if uint64 values fit in int64 range before conversion
+	const maxInt64 = uint64(1<<63 - 1)
 
-	if int64(stat.Blocks) > maxInt64 {
+	if stat.Blocks > maxInt64 {
 		return nil, fmt.Errorf("blocks value %d exceeds int64 maximum", stat.Blocks)
 	}
-	if int64(stat.Bsize) > maxInt64 {
-		return nil, fmt.Errorf("block size value %d exceeds int64 maximum", stat.Bsize)
-	}
-	if int64(stat.Bavail) > maxInt64 {
+	if stat.Bavail > maxInt64 {
 		return nil, fmt.Errorf("available blocks value %d exceeds int64 maximum", stat.Bavail)
 	}
+	// Bsize is already int64, just check for negative values
+	if stat.Bsize < 0 {
+		return nil, fmt.Errorf("block size cannot be negative: %d", stat.Bsize)
+	}
 
+	// #nosec G115 - Safe conversion: bounds checked above
 	blocks := int64(stat.Blocks)
-	bsize := int64(stat.Bsize)
+	bsize := stat.Bsize // Already int64
+	// #nosec G115 - Safe conversion: bounds checked above
 	bavail := int64(stat.Bavail)
 
 	// Check for potential overflow before multiplication
-	if blocks > 0 && bsize > 0 && blocks > maxInt64/bsize {
+	if blocks > 0 && bsize > 0 && blocks > int64(maxInt64)/bsize {
 		return nil, fmt.Errorf("disk size calculation would overflow")
 	}
-	if bavail > 0 && bsize > 0 && bavail > maxInt64/bsize {
+	if bavail > 0 && bsize > 0 && bavail > int64(maxInt64)/bsize {
 		return nil, fmt.Errorf("available disk calculation would overflow")
 	}
 
