@@ -61,7 +61,11 @@ func newExecuteCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
+			defer func() {
+				if err := conn.Close(); err != nil {
+					logrus.WithError(err).Warn("Failed to close connection")
+				}
+			}()
 
 			// Parse destruction type
 			dtype, err := parseDestructionType(destructionType)
@@ -143,7 +147,11 @@ func newSystemInfoCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
+			defer func() {
+				if err := conn.Close(); err != nil {
+					logrus.WithError(err).Warn("Failed to close connection")
+				}
+			}()
 
 			ctx, cancel := context.WithTimeout(context.Background(), getTimeout(cmd))
 			defer cancel()
@@ -205,7 +213,11 @@ func newGenerateScenarioCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
+			defer func() {
+				if err := conn.Close(); err != nil {
+					logrus.WithError(err).Warn("Failed to close connection")
+				}
+			}()
 
 			// Parse severity
 			sev, err := parseSeverity(maxSeverity)
@@ -290,7 +302,11 @@ func newStreamCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
+			defer func() {
+				if err := conn.Close(); err != nil {
+					logrus.WithError(err).Warn("Failed to close connection")
+				}
+			}()
 
 			// Parse destruction type
 			dtype, err := parseDestructionType(destructionType)
@@ -365,7 +381,8 @@ func newStreamCommand() *cobra.Command {
 func createClient(cmd *cobra.Command) (pb.BurnDeviceServiceClient, *grpc.ClientConn, error) {
 	serverAddr, _ := cmd.Flags().GetString("server")
 
-	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Use the new grpc.NewClient instead of deprecated grpc.Dial
+	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to server: %w", err)
 	}

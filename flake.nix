@@ -35,6 +35,7 @@
             # Security scanning tools
             gosec
             govulncheck
+            golangci-lint
           ];
 
           shellHook = ''

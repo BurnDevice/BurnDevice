@@ -4,6 +4,9 @@ run:
   tests: true
   modules-download-mode: readonly
 
+# Configuration file version
+version: 2
+
 output:
   format: colored-line-number
   print-issued-lines: true
@@ -70,8 +73,8 @@ linters-settings:
     severity: medium
     confidence: medium
     excludes:
-      - G104  # 审计错误未检查 - 在某些情况下可接受
-      - G204  # 子进程启动 - 项目需要执行系统命令
+      - G104  # 审计错误未检查
+      - G204  # 子进程启动
 
   # 性能检查
   prealloc:
@@ -103,7 +106,6 @@ linters:
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     
     # 代码质量

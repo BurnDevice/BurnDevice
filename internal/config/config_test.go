@@ -122,8 +122,12 @@ func TestValidate(t *testing.T) {
 
 func TestEnvironmentVariables(t *testing.T) {
 	// Clear any existing environment variables first
-	os.Unsetenv("BURNDEVICE_SERVER_HOST")
-	os.Unsetenv("BURNDEVICE_SERVER_PORT")
+	if err := os.Unsetenv("BURNDEVICE_SERVER_HOST"); err != nil {
+		t.Errorf("Failed to unset BURNDEVICE_SERVER_HOST: %v", err)
+	}
+	if err := os.Unsetenv("BURNDEVICE_SERVER_PORT"); err != nil {
+		t.Errorf("Failed to unset BURNDEVICE_SERVER_PORT: %v", err)
+	}
 
 	// Set environment variables with correct viper format
 	err := os.Setenv("BURNDEVICE_SERVER_HOST", "test-host")
@@ -136,8 +140,12 @@ func TestEnvironmentVariables(t *testing.T) {
 	}
 
 	defer func() {
-		os.Unsetenv("BURNDEVICE_SERVER_HOST")
-		os.Unsetenv("BURNDEVICE_SERVER_PORT")
+		if err := os.Unsetenv("BURNDEVICE_SERVER_HOST"); err != nil {
+			t.Errorf("Failed to unset BURNDEVICE_SERVER_HOST: %v", err)
+		}
+		if err := os.Unsetenv("BURNDEVICE_SERVER_PORT"); err != nil {
+			t.Errorf("Failed to unset BURNDEVICE_SERVER_PORT: %v", err)
+		}
 	}()
 
 	cfg, err := Load("")

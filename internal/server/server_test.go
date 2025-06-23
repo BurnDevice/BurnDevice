@@ -213,7 +213,7 @@ func TestGenerateAttackScenario(t *testing.T) {
 
 	// Test invalid request (empty target description)
 	req.TargetDescription = ""
-	resp, err = server.GenerateAttackScenario(ctx, req)
+	_, err = server.GenerateAttackScenario(ctx, req)
 	if err == nil {
 		t.Error("Expected error with empty target description")
 	}
@@ -554,7 +554,7 @@ func TestComplexValidationScenarios(t *testing.T) {
 
 	// Test empty targets
 	req.Targets = []string{}
-	err = server.validateDestructionRequest(req)
+	_ = server.validateDestructionRequest(req)
 	// This should be handled by the destruction engine, not validation
 	// So we don't expect a validation error here
 }

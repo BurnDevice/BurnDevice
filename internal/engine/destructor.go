@@ -452,14 +452,22 @@ func (e *DestructionEngine) copyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() {
+		if err := sourceFile.Close(); err != nil {
+			e.logger.WithError(err).Warn("Failed to close source file")
+		}
+	}()
 
 	// #nosec G304 - Path is validated and sanitized above
 	destFile, err := os.Create(absDst)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() {
+		if err := destFile.Close(); err != nil {
+			e.logger.WithError(err).Warn("Failed to close destination file")
+		}
+	}()
 
 	_, err = io.Copy(destFile, sourceFile)
 	if err != nil {

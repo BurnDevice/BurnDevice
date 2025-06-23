@@ -122,6 +122,7 @@ func TestNewServerCmd(t *testing.T) {
 	flag := cmd.Flags().Lookup("config")
 	if flag == nil {
 		t.Error("Expected 'config' flag to be defined")
+		return
 	}
 
 	if flag.DefValue != "config.yaml" {

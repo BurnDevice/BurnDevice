@@ -60,7 +60,11 @@ func TestExecuteDestruction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create test file
 	testFile := filepath.Join(tempDir, "test.txt")
@@ -206,7 +210,11 @@ func TestSafeDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create test file with content
 	testFile := filepath.Join(tempDir, "test.txt")
@@ -450,7 +458,11 @@ func TestCopyFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create source file
 	srcFile := filepath.Join(tempDir, "source.txt")
@@ -601,7 +613,7 @@ func TestComplexValidationScenarios(t *testing.T) {
 
 	// Test empty targets
 	req.Targets = []string{}
-	err = engine.validateExecuteRequest(req)
+	_ = engine.validateExecuteRequest(req)
 	// Empty targets might be valid depending on destruction type
 	// The specific validation depends on implementation
 }
@@ -612,7 +624,11 @@ func TestExecuteDestructionTypes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	cfg := &config.Config{
 		Security: config.SecurityConfig{
@@ -661,6 +677,7 @@ func TestExecuteDestructionTypes(t *testing.T) {
 
 			if resp == nil {
 				t.Errorf("Expected response for destruction type %s", dtype.String())
+				return
 			}
 
 			if !resp.Success {

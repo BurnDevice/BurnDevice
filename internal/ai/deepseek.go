@@ -225,7 +225,11 @@ func (c *DeepSeekClient) callDeepSeekAPI(ctx context.Context, systemPrompt, user
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			c.logger.WithError(err).Warn("Failed to close response body")
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)

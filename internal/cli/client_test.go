@@ -127,7 +127,9 @@ func TestGetTimeout(t *testing.T) {
 	}
 
 	// Test setting custom timeout
-	cmd.Flags().Set("timeout", "60s")
+	if err := cmd.Flags().Set("timeout", "60s"); err != nil {
+		t.Errorf("Failed to set timeout flag: %v", err)
+	}
 	timeout = getTimeout(cmd)
 	expected = 60 * time.Second
 	if timeout != expected {
@@ -245,9 +247,15 @@ func TestExecuteCommandValidation(t *testing.T) {
 	cmd.SetErr(&buf)
 
 	// Set required flags but not confirm
-	cmd.Flags().Set("type", "FILE_DELETION")
-	cmd.Flags().Set("targets", "test.txt")
-	cmd.Flags().Set("severity", "LOW")
+	if err := cmd.Flags().Set("type", "FILE_DELETION"); err != nil {
+		t.Errorf("Failed to set type flag: %v", err)
+	}
+	if err := cmd.Flags().Set("targets", "test.txt"); err != nil {
+		t.Errorf("Failed to set targets flag: %v", err)
+	}
+	if err := cmd.Flags().Set("severity", "LOW"); err != nil {
+		t.Errorf("Failed to set severity flag: %v", err)
+	}
 
 	err := cmd.RunE(cmd, []string{})
 	if err == nil {
@@ -263,8 +271,12 @@ func TestExecuteCommandWithInvalidType(t *testing.T) {
 	cmd := newExecuteCommand()
 
 	// Set invalid destruction type
-	cmd.Flags().Set("type", "INVALID_TYPE")
-	cmd.Flags().Set("confirm", "true")
+	if err := cmd.Flags().Set("type", "INVALID_TYPE"); err != nil {
+		t.Errorf("Failed to set type flag: %v", err)
+	}
+	if err := cmd.Flags().Set("confirm", "true"); err != nil {
+		t.Errorf("Failed to set confirm flag: %v", err)
+	}
 
 	err := cmd.RunE(cmd, []string{})
 	if err == nil {
@@ -276,9 +288,15 @@ func TestExecuteCommandWithInvalidSeverity(t *testing.T) {
 	cmd := newExecuteCommand()
 
 	// Set valid type but invalid severity
-	cmd.Flags().Set("type", "FILE_DELETION")
-	cmd.Flags().Set("severity", "INVALID_SEVERITY")
-	cmd.Flags().Set("confirm", "true")
+	if err := cmd.Flags().Set("type", "FILE_DELETION"); err != nil {
+		t.Errorf("Failed to set type flag: %v", err)
+	}
+	if err := cmd.Flags().Set("severity", "INVALID_SEVERITY"); err != nil {
+		t.Errorf("Failed to set severity flag: %v", err)
+	}
+	if err := cmd.Flags().Set("confirm", "true"); err != nil {
+		t.Errorf("Failed to set confirm flag: %v", err)
+	}
 
 	err := cmd.RunE(cmd, []string{})
 	if err == nil {
@@ -296,14 +314,18 @@ func TestCreateClientConnectionError(t *testing.T) {
 	if err != nil {
 		// Expected - connection should fail
 		if conn != nil {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				t.Errorf("Failed to close connection: %v", err)
+			}
 		}
 		return
 	}
 
 	// If we get here, the connection might have been created
 	if conn != nil {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			t.Errorf("Failed to close connection: %v", err)
+		}
 	}
 
 	// We can't guarantee this will fail in all environments, so just check the client is created
@@ -374,13 +396,13 @@ func TestCommandDescriptions(t *testing.T) {
 
 func TestParseDestructionTypeEdgeCases(t *testing.T) {
 	// Test with whitespace - should fail since function doesn't trim
-	result, err := parseDestructionType("  FILE_DELETION  ")
+	_, err := parseDestructionType("  FILE_DELETION  ")
 	if err == nil {
 		t.Error("Expected error with whitespace since function doesn't trim")
 	}
 
 	// Test case insensitive - should work due to strings.ToUpper
-	result, err = parseDestructionType("file_deletion")
+	result, err := parseDestructionType("file_deletion")
 	if err != nil {
 		t.Errorf("Expected no error with lowercase, got: %v", err)
 	}
@@ -400,13 +422,13 @@ func TestParseDestructionTypeEdgeCases(t *testing.T) {
 
 func TestParseSeverityEdgeCases(t *testing.T) {
 	// Test with whitespace - should fail since function doesn't trim
-	result, err := parseSeverity("  HIGH  ")
+	_, err := parseSeverity("  HIGH  ")
 	if err == nil {
 		t.Error("Expected error with whitespace since function doesn't trim")
 	}
 
 	// Test case insensitive - should work due to strings.ToUpper
-	result, err = parseSeverity("low")
+	result, err := parseSeverity("low")
 	if err != nil {
 		t.Errorf("Expected no error with lowercase, got: %v", err)
 	}
@@ -477,14 +499,18 @@ func TestTimeoutHandling(t *testing.T) {
 	cmd.Flags().Duration("timeout", 0, "Request timeout")
 
 	// Test zero timeout
-	cmd.Flags().Set("timeout", "0s")
+	if err := cmd.Flags().Set("timeout", "0s"); err != nil {
+		t.Errorf("Failed to set timeout flag: %v", err)
+	}
 	timeout := getTimeout(cmd)
 	if timeout != 0 {
 		t.Errorf("Expected timeout 0, got %v", timeout)
 	}
 
 	// Test negative timeout (should still work)
-	cmd.Flags().Set("timeout", "-5s")
+	if err := cmd.Flags().Set("timeout", "-5s"); err != nil {
+		t.Errorf("Failed to set timeout flag: %v", err)
+	}
 	timeout = getTimeout(cmd)
 	if timeout != -5*time.Second {
 		t.Errorf("Expected timeout -5s, got %v", timeout)
@@ -503,7 +529,9 @@ func TestGRPCClientCreation(t *testing.T) {
 
 	// Clean up if connection was established
 	if conn != nil {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			t.Errorf("Failed to close connection: %v", err)
+		}
 	}
 
 	// In test environment, we expect either:
