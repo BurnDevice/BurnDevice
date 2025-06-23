@@ -16,7 +16,7 @@ ARG BUF_VERSION=1.28.1
 ARG TARGETARCH
 RUN case ${TARGETARCH} in \
         amd64) BUF_ARCH=x86_64 ;; \
-        arm64) BUF_ARCH=aarch_64 ;; \
+        arm64) BUF_ARCH=aarch64 ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
     esac && \
     curl -sSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-${BUF_ARCH}" -o /usr/local/bin/buf && \
