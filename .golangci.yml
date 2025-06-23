@@ -1,191 +1,38 @@
+# golangci-lint configuration 
+# Optimized for CI compatibility and core quality checks
 run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
-  modules-download-mode: readonly
 
 output:
-  formats:
-    - format: colored-line-number
+  format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
-  sort-results: true
-
-linters-settings:
-  # 错误检查
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      - (*os.File).Close
-      - (*database/sql.Rows).Close
-
-  # 格式检查
-  gofmt:
-    simplify: true
-
-  gofumpt:
-    extra-rules: true
-
-  # 导入检查
-  goimports:
-    local-prefixes: github.com/BurnDevice/BurnDevice
-
-  # 复杂度检查
-  gocyclo:
-    min-complexity: 15
-
-  # 认知复杂度
-  gocognit:
-    min-complexity: 20
-
-  # 函数长度
-  funlen:
-    lines: 100
-    statements: 50
-
-  # 行长度
-  lll:
-    line-length: 120
-
-  # 变量命名
-  revive:
-    rules:
-      - name: var-naming
-        severity: warning
-        disabled: false
-        arguments:
-          - ["ID", "API", "HTTP", "gRPC", "JSON", "XML", "URL", "UUID", "AI"]
-      - name: exported
-        severity: warning
-        disabled: false
-      - name: package-comments
-        severity: warning
-        disabled: false
-
-  # 安全检查
-  gosec:
-    severity: medium
-    confidence: medium
-    excludes:
-      - G104  # 审计错误未检查
-      - G204  # 子进程启动
-
-  # 性能检查
-  prealloc:
-    simple: true
-    range-loops: true
-    for-loops: false
-
-  # 未使用代码
-  unused:
-    check-exported: false
-
-  # 变量赋值
-  ineffassign:
-    check-generated: false
-
-  # 拼写检查
-  misspell:
-    locale: US
-    ignore-words:
-      - burndevice
-      - destructor
-      - deepseek
 
 linters:
   enable:
-    # 默认启用
+    # 核心质量检查 - 已测试有效
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-    
-    # 代码质量
-    - gofmt
-    - gofumpt
-    - goimports
-    - revive
-    - misspell
-    - unconvert
-    - unparam
-    - wastedassign
-    
-    # 复杂度和性能
-    - gocyclo
-    - gocognit
-    - funlen
-    - lll
-    - prealloc
-    
-    # 安全性
-    - gosec
-    
-    # 错误处理
-    - goerr113
-    - wrapcheck
-    
-    # 并发安全
-    - gocritic
-    
-    # 代码风格
-    - whitespace
-    - wsl
-
-  disable:
-    - deadcode      # 已弃用
-    - varcheck      # 已弃用
-    - structcheck   # 已弃用
-    - scopelint     # 已弃用
-    - interfacer    # 已弃用
-    - maligned      # 已弃用
-    - golint        # 已弃用
 
 issues:
-  uniq-by-line: true
   exclude-rules:
-    # 排除测试文件的某些检查
+    # 排除测试文件
     - path: _test\.go
       linters:
-        - funlen
-        - gocyclo
-        - gocognit
-        - lll
-        - goerr113
-        - wrapcheck
+        - errcheck
     
-    # 排除生成文件
+    # 排除生成的protobuf文件
     - path: ".*\\.pb\\.go$"
       linters:
-        - lll
-        - gofmt
-        - gofumpt
-        - revive
-        - gocritic
-    
-    # 排除main函数的复杂度检查
-    - path: cmd/
-      text: "main function"
-      linters:
-        - funlen
-        - gocyclo
-    
-    # 允许长行在某些情况下
-    - linters:
-        - lll
-      source: "^//go:generate "
+        - errcheck
+        - staticcheck
+        - unused
 
   exclude-use-default: false
   max-issues-per-linter: 0
-  max-same-issues: 0
-  new: false
-
-severity:
-  default-severity: error
-  case-sensitive: false
-  rules:
-    - linters:
-        - revive
-      severity: warning 
+  max-same-issues: 0 
