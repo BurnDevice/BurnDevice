@@ -279,31 +279,148 @@ func (s *SystemInfo) getLinuxMemoryInfo() (*MemoryInfo, error) {
 
 // getWindowsMemoryInfo gets Windows memory information
 func (s *SystemInfo) getWindowsMemoryInfo() (*MemoryInfo, error) {
-	// This is a simplified implementation
-	// In production, you would use Windows API calls
-	cmd := exec.Command("wmic", "computersystem", "get", "TotalPhysicalMemory", "/value")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, err
+	// Try wmic first
+	memInfo, err := s.getWindowsMemoryInfoWmic()
+	if err == nil {
+		return memInfo, nil
 	}
 
+	// Fallback to PowerShell
+	return s.getWindowsMemoryInfoPowerShell()
+}
+
+// getWindowsMemoryInfoWmic uses wmic to get memory information
+func (s *SystemInfo) getWindowsMemoryInfoWmic() (*MemoryInfo, error) {
+	// Get total physical memory
+	cmd := exec.Command("wmic", "computersystem", "get", "TotalPhysicalMemory", "/format:list")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get total memory via wmic: %v", err)
+	}
+
+	var totalMemory int64
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "TotalPhysicalMemory=") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "TotalPhysicalMemory=") {
 			parts := strings.Split(line, "=")
-			if len(parts) == 2 {
+			if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
 				total, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
 				if err == nil {
-					return &MemoryInfo{
-						Total:     total,
-						Available: total / 2, // Rough estimate
-					}, nil
+					totalMemory = total
+					break
 				}
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("failed to parse memory info")
+	if totalMemory == 0 {
+		return nil, fmt.Errorf("failed to get total memory")
+	}
+
+	// Get available memory
+	cmd = exec.Command("wmic", "OS", "get", "FreePhysicalMemory", "/format:list")
+	output, err = cmd.Output()
+	if err != nil {
+		// If we can't get available memory, estimate it as 50% of total
+		return &MemoryInfo{
+			Total:     totalMemory,
+			Available: totalMemory / 2,
+		}, nil
+	}
+
+	var availableMemory int64
+	lines = strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "FreePhysicalMemory=") {
+			parts := strings.Split(line, "=")
+			if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
+				// FreePhysicalMemory is in KB, convert to bytes
+				available, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+				if err == nil {
+					availableMemory = available * 1024
+					break
+				}
+			}
+		}
+	}
+
+	if availableMemory == 0 {
+		availableMemory = totalMemory / 2 // Fallback estimate
+	}
+
+	return &MemoryInfo{
+		Total:     totalMemory,
+		Available: availableMemory,
+	}, nil
+}
+
+// getWindowsMemoryInfoPowerShell uses PowerShell to get memory information
+func (s *SystemInfo) getWindowsMemoryInfoPowerShell() (*MemoryInfo, error) {
+	// Get total physical memory
+	cmd := exec.Command("powershell", "-Command", "Get-WmiObject -Class Win32_ComputerSystem | Select-Object TotalPhysicalMemory | ConvertTo-Json")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get memory info via PowerShell: %v", err)
+	}
+
+	var totalMemory int64
+	content := string(output)
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "TotalPhysicalMemory") && strings.Contains(line, ":") {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				memStr := strings.Trim(strings.TrimSpace(parts[1]), ",")
+				if mem, err := strconv.ParseInt(memStr, 10, 64); err == nil {
+					totalMemory = mem
+					break
+				}
+			}
+		}
+	}
+
+	if totalMemory == 0 {
+		return nil, fmt.Errorf("failed to parse total memory from PowerShell")
+	}
+
+	// Get available memory
+	cmd = exec.Command("powershell", "-Command", "Get-WmiObject -Class Win32_OperatingSystem | Select-Object FreePhysicalMemory | ConvertTo-Json")
+	output, err = cmd.Output()
+	if err != nil {
+		return &MemoryInfo{
+			Total:     totalMemory,
+			Available: totalMemory / 2,
+		}, nil
+	}
+
+	var availableMemory int64
+	content = string(output)
+	lines = strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "FreePhysicalMemory") && strings.Contains(line, ":") {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				freeStr := strings.Trim(strings.TrimSpace(parts[1]), ",")
+				if free, err := strconv.ParseInt(freeStr, 10, 64); err == nil {
+					availableMemory = free * 1024 // Convert KB to bytes
+					break
+				}
+			}
+		}
+	}
+
+	if availableMemory == 0 {
+		availableMemory = totalMemory / 2
+	}
+
+	return &MemoryInfo{
+		Total:     totalMemory,
+		Available: availableMemory,
+	}, nil
 }
 
 // getDarwinMemoryInfo gets macOS memory information
@@ -368,17 +485,31 @@ func (s *SystemInfo) getLinuxCPUUsage() (float64, error) {
 
 // getWindowsCPUUsage gets CPU usage on Windows
 func (s *SystemInfo) getWindowsCPUUsage() (float64, error) {
-	cmd := exec.Command("wmic", "cpu", "get", "loadpercentage", "/value")
+	// Try wmic first
+	usage, err := s.getWindowsCPUUsageWmic()
+	if err == nil {
+		return usage, nil
+	}
+
+	// Fallback to PowerShell
+	return s.getWindowsCPUUsagePowerShell()
+}
+
+// getWindowsCPUUsageWmic uses wmic to get CPU usage
+func (s *SystemInfo) getWindowsCPUUsageWmic() (float64, error) {
+	// Use wmic to get CPU load percentage
+	cmd := exec.Command("wmic", "cpu", "get", "loadpercentage", "/format:list")
 	output, err := cmd.Output()
 	if err != nil {
-		return 0.0, err
+		return 0.0, fmt.Errorf("failed to get CPU usage via wmic: %v", err)
 	}
 
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "LoadPercentage=") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "LoadPercentage=") {
 			parts := strings.Split(line, "=")
-			if len(parts) == 2 {
+			if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
 				usage, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
 				if err == nil {
 					return usage, nil
@@ -387,7 +518,33 @@ func (s *SystemInfo) getWindowsCPUUsage() (float64, error) {
 		}
 	}
 
-	return 0.0, fmt.Errorf("failed to parse CPU usage")
+	return 0.0, fmt.Errorf("failed to parse CPU usage from wmic output")
+}
+
+// getWindowsCPUUsagePowerShell uses PowerShell to get CPU usage
+func (s *SystemInfo) getWindowsCPUUsagePowerShell() (float64, error) {
+	cmd := exec.Command("powershell", "-Command", "Get-WmiObject -Class Win32_Processor | Measure-Object -Property LoadPercentage -Average | Select-Object Average | ConvertTo-Json")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0.0, fmt.Errorf("failed to get CPU usage via PowerShell: %v", err)
+	}
+
+	content := string(output)
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "Average") && strings.Contains(line, ":") {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				avgStr := strings.Trim(strings.TrimSpace(parts[1]), ",")
+				if avg, err := strconv.ParseFloat(avgStr, 64); err == nil {
+					return avg, nil
+				}
+			}
+		}
+	}
+
+	return 0.0, fmt.Errorf("failed to parse CPU usage from PowerShell output")
 }
 
 // getDarwinCPUUsage gets CPU usage on macOS
