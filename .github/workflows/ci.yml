@@ -28,6 +28,7 @@ jobs:
       uses: bufbuild/buf-setup-action@v1
       with:
         version: ${{ env.BUF_VERSION }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -115,6 +116,7 @@ jobs:
       uses: bufbuild/buf-setup-action@v1
       with:
         version: ${{ env.BUF_VERSION }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Buf (Windows)
       if: runner.os == 'Windows'
@@ -179,6 +181,7 @@ jobs:
       uses: bufbuild/buf-setup-action@v1
       with:
         version: ${{ env.BUF_VERSION }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -282,12 +285,12 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
-    - name: Run Nancy (dependency vulnerability scanner)
-      run: |
-        go install github.com/sonatypecommunity/nancy@latest
-        go list -json -m all | nancy sleuth
-
-    - name: Run govulncheck
+    - name: Run govulncheck (Go vulnerability scanner)
       run: |
         go install golang.org/x/vuln/cmd/govulncheck@latest
-        govulncheck ./... 
+        govulncheck ./...
+
+    - name: Run gosec (security scanner)
+      run: |
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        gosec ./... 
