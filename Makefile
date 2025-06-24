@@ -198,104 +198,88 @@ clean: ## Clean build artifacts
 clean-all: clean ## Clean everything including dependencies
 	go clean -modcache
 
-# Release
-release: clean build-all ## Create release artifacts
-	mkdir -p release
-	cp bin/* release/
-	tar -czf release/burndevice-$(VERSION)-linux-amd64.tar.gz -C bin $(BINARY_NAME)-linux-amd64
-	tar -czf release/burndevice-$(VERSION)-linux-arm64.tar.gz -C bin $(BINARY_NAME)-linux-arm64
-	tar -czf release/burndevice-$(VERSION)-darwin-amd64.tar.gz -C bin $(BINARY_NAME)-darwin-amd64
-	tar -czf release/burndevice-$(VERSION)-darwin-arm64.tar.gz -C bin $(BINARY_NAME)-darwin-arm64
-	zip -j release/burndevice-$(VERSION)-windows-amd64.zip bin/$(BINARY_NAME)-windows-amd64.exe
-	@echo "📦 Release artifacts created in release/ directory"
+# Release management - 简化版本
+.PHONY: release-check release-build release-publish
 
-# Release management
-.PHONY: release-check release-tag release-local version-patch version-minor version-major
+# 发布前检查
+release-check: ## 发布前检查
+	@echo "🔍 发布前检查..."
+	@git diff --quiet || (echo "❌ 工作目录不干净" && exit 1)
+	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "main" ] || (echo "❌ 请在main分支发布" && exit 1)
+	@make test-short
+	@echo "✅ 检查通过"
 
-release-check: ## Pre-release checks
-	@echo "🔍 Running pre-release checks..."
-	@echo "1. Checking git status..."
-	@git diff --quiet || (echo "❌ Working directory is dirty" && exit 1)
-	@git diff --cached --quiet || (echo "❌ Staged changes found" && exit 1)
-	@echo "2. Checking current branch..."
-	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "main" ] || (echo "❌ Not on main branch, current: $$(git rev-parse --abbrev-ref HEAD)" && exit 1)
-	@echo "3. Checking for unpushed commits..."
-	@git fetch origin main
-	@[ "$$(git rev-list HEAD...origin/main --count)" = "0" ] || (echo "❌ Local commits not pushed to origin/main" && exit 1)
-	@echo "4. Running full CI pipeline..."
-	@make ci
-	@echo "✅ All pre-release checks passed"
-
-release-tag: release-check ## Create and push release tag
+# 构建发布包
+release-build: clean ## 构建发布包
 	@if [ -z "$(VERSION)" ]; then \
-		echo "❌ Usage: make release-tag VERSION=v1.0.0"; \
-		echo ""; \
-		echo "📋 Version format examples:"; \
-		echo "  - Major release: v1.0.0"; \
-		echo "  - Minor release: v1.1.0"; \
-		echo "  - Patch release: v1.0.1"; \
-		echo "  - Pre-release: v1.0.0-alpha.1, v1.0.0-beta.1, v1.0.0-rc.1"; \
+		echo "❌ 请指定版本: make release-build VERSION=v1.0.0"; \
 		exit 1; \
 	fi
-	@echo "🏷️ Creating release tag $(VERSION)..."
-	@git tag -a "$(VERSION)" -m "🔥 Release $(VERSION)"
-	@git push origin "$(VERSION)"
-	@echo ""
-	@echo "✅ Release $(VERSION) tagged and pushed!"
-	@echo "📦 GitHub Actions: https://github.com/BurnDevice/BurnDevice/actions"
-	@echo "📋 Release page: https://github.com/BurnDevice/BurnDevice/releases"
-	@echo ""
-	@echo "⏰ Expected completion: 5-10 minutes"
-	@echo "🎯 Release artifacts will include:"
-	@echo "   - Multi-platform binaries (Linux, macOS, Windows)"
-	@echo "   - Docker images (ghcr.io/burndevice/burndevice:$(VERSION))"
-	@echo "   - Source code archives"
-
-release-local: clean build-all ## Create local release artifacts for testing
-	@echo "📦 Creating local release artifacts..."
+	@echo "📦 构建 $(VERSION) 发布包..."
+	@make build-all
 	@mkdir -p release
-	@cp bin/* release/ 2>/dev/null || true
-	@cd release && \
-		for file in burndevice-*; do \
-			if [[ "$$file" == *".exe" ]]; then \
-				zip "$${file%.*}.zip" "$$file" && rm "$$file"; \
-			else \
-				tar -czf "$${file}.tar.gz" "$$file" && rm "$$file"; \
-			fi; \
-		done
-	@echo "✅ Local release artifacts created in release/"
+	@echo "🗜️ 创建压缩包..."
+	@cd bin && \
+		tar -czf ../release/burndevice-$(VERSION)-linux-amd64.tar.gz burndevice-linux-amd64 && \
+		tar -czf ../release/burndevice-$(VERSION)-linux-arm64.tar.gz burndevice-linux-arm64 && \
+		tar -czf ../release/burndevice-$(VERSION)-darwin-amd64.tar.gz burndevice-darwin-amd64 && \
+		tar -czf ../release/burndevice-$(VERSION)-darwin-arm64.tar.gz burndevice-darwin-arm64 && \
+		tar -czf ../release/burndevice-$(VERSION)-windows-amd64.tar.gz burndevice-windows-amd64.exe
+	@echo "✅ 发布包构建完成:"
 	@ls -la release/
 
-# Version helpers
-version-current: ## Show current version
-	@echo "Current version: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')"
-
-version-patch: ## Suggest next patch version
-	@echo "Current: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')"
-	@echo "Next patch: $$(git describe --tags --abbrev=0 2>/dev/null | sed 's/v//' | awk -F. '{print "v" $$1 "." $$2 "." $$3+1}' || echo 'v0.0.1')"
-
-version-minor: ## Suggest next minor version  
-	@echo "Current: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')"
-	@echo "Next minor: $$(git describe --tags --abbrev=0 2>/dev/null | sed 's/v//' | awk -F. '{print "v" $$1 "." $$2+1 ".0"}' || echo 'v0.1.0')"
-
-version-major: ## Suggest next major version
-	@echo "Current: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')"
-	@echo "Next major: $$(git describe --tags --abbrev=0 2>/dev/null | sed 's/v//' | awk -F. '{print "v" $$1+1 ".0.0"}' || echo 'v1.0.0')"
-
-# GoReleaser support (optional, for future use)
-goreleaser-check: ## Check GoReleaser configuration
-	@if command -v goreleaser >/dev/null 2>&1; then \
-		goreleaser check; \
-	else \
-		echo "⚠️  GoReleaser not installed, skipping check"; \
+# 发布到GitHub
+release-publish: release-check release-build ## 发布到GitHub
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ 请指定版本: make release-publish VERSION=v1.0.0"; \
+		exit 1; \
 	fi
+	@echo "🚀 发布 $(VERSION)..."
+	@git tag $(VERSION)
+	@git push origin $(VERSION)
+	@echo "⏳ 等待GitHub Actions构建..."
+	@sleep 10
+	@echo "📦 上传发布包..."
+	@gh release upload $(VERSION) release/*.tar.gz || \
+		(echo "⚠️ GitHub Release可能还未创建，请稍后手动上传" && \
+		 echo "📋 使用命令: gh release upload $(VERSION) release/*.tar.gz")
+	@echo ""
+	@echo "🎉 发布完成!"
+	@echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"
 
-goreleaser-snapshot: ## Build snapshot release with GoReleaser
-	@if command -v goreleaser >/dev/null 2>&1; then \
-		goreleaser release --snapshot --clean; \
-	else \
-		echo "⚠️  GoReleaser not installed, use 'make release-local' instead"; \
+# 一键发布 (推荐使用)
+release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
+	@if [ -z "$(VERSION)" ]; then \
+		echo ""; \
+		echo "🚀 BurnDevice 一键发布"; \
+		echo ""; \
+		echo "使用方法:"; \
+		echo "  make release VERSION=v1.0.0"; \
+		echo ""; \
+		echo "版本格式:"; \
+		echo "  主版本: v1.0.0"; \
+		echo "  次版本: v1.1.0"; \
+		echo "  补丁版本: v1.0.1"; \
+		echo "  预发布: v1.0.0-beta.1"; \
+		echo ""; \
+		echo "当前版本: $$(git describe --tags --abbrev=0 2>/dev/null || echo '未找到标签')"; \
+		echo ""; \
+		exit 1; \
 	fi
+	@make release-publish VERSION=$(VERSION)
+
+# 版本信息
+version-current: ## 显示当前版本
+	@echo "当前版本: $$(git describe --tags --abbrev=0 2>/dev/null || echo '未找到标签')"
+
+# 本地测试发布包
+release-test: release-build ## 本地测试发布包
+	@echo "🧪 测试发布包..."
+	@cd /tmp && \
+		tar -xzf $(PWD)/release/burndevice-$(VERSION)-linux-amd64.tar.gz && \
+		./burndevice-linux-amd64 --version && \
+		rm burndevice-linux-amd64
+	@echo "✅ 发布包测试通过"
 
 # Generate example scenarios
 generate-example: build ## Generate example attack scenarios
