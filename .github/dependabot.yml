@@ -31,10 +31,9 @@ updates:
           - "minor"
           - "patch"
       security-updates:
+        applies-to: "security-updates"
         patterns:
           - "*"
-        update-types:
-          - "security"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -88,4 +87,4 @@ updates:
           - "*"
         update-types:
           - "minor"
-          - "patch" 
+          - "patch"
