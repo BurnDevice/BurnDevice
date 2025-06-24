@@ -1,5 +1,9 @@
 # golangci-lint configuration 
 # Optimized for CI compatibility and core quality checks
+
+# 版本兼容性配置 - 支持golangci-lint v2.x
+version: 2
+
 run:
   timeout: 5m
   issues-exit-code: 1
