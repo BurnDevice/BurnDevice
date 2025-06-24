@@ -6,10 +6,6 @@ on:
     workflows: ["🔥 BurnDevice CI"]
     types: [completed]
     # 移除 branches 限制，让它可以响应所有分支的 CI
-  
-  # 也在 PR 的状态检查完成时触发
-  check_suite:
-    types: [completed]
 
 permissions:
   contents: write
@@ -22,9 +18,7 @@ jobs:
     name: 🔄 Auto-merge Dependabot PRs
     runs-on: ubuntu-latest
     # 只处理成功的工作流运行
-    if: |
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run != null) ||
-      (github.event.check_suite.conclusion == 'success' && github.event.check_suite != null)
+    if: github.event.workflow_run.conclusion == 'success'
     
     steps:
     - name: 🔍 Find associated PR
@@ -32,23 +26,10 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          let head_sha = null;
+          const head_sha = context.payload.workflow_run.head_sha;
+          const head_branch = context.payload.workflow_run.head_branch;
           
-          // 从不同事件类型获取 SHA
-          if (context.eventName === 'workflow_run' && context.payload.workflow_run) {
-            head_sha = context.payload.workflow_run.head_sha;
-            console.log(`📋 Workflow run event - SHA: ${head_sha}`);
-          } else if (context.eventName === 'check_suite' && context.payload.check_suite) {
-            head_sha = context.payload.check_suite.head_sha;
-            console.log(`✅ Check suite event - SHA: ${head_sha}`);
-          }
-          
-          if (!head_sha) {
-            console.log('❌ Could not determine head SHA from event');
-            return { found: false, reason: 'No head SHA found' };
-          }
-          
-          console.log(`🔍 Looking for PR with head SHA: ${head_sha}`);
+          console.log(`📋 Workflow run event - SHA: ${head_sha}, Branch: ${head_branch}`);
           
           // 查找对应的 PR
           const { data: prs } = await github.rest.pulls.list({
@@ -59,12 +40,22 @@ jobs:
           
           console.log(`📊 Found ${prs.length} open PRs`);
           
-          const pr = prs.find(pr => pr.head.sha === head_sha);
+          // 首先尝试通过 SHA 匹配
+          let pr = prs.find(pr => pr.head.sha === head_sha);
+          
+          // 如果 SHA 匹配失败，尝试通过分支名匹配（备用方案）
+          if (!pr && head_branch) {
+            pr = prs.find(pr => pr.head.ref === head_branch);
+            if (pr) {
+              console.log(`⚠️ SHA mismatch but found PR by branch name: ${head_branch}`);
+              console.log(`  Expected SHA: ${head_sha}, PR SHA: ${pr.head.sha}`);
+            }
+          }
           
           if (!pr) {
-            console.log('❌ No open PR found for this SHA');
-            console.log('🔍 Available PR SHAs:');
-            prs.forEach(p => console.log(`  - PR #${p.number}: ${p.head.sha} (${p.user.login})`));
+            console.log('❌ No open PR found for this SHA or branch');
+            console.log('🔍 Available PRs:');
+            prs.forEach(p => console.log(`  - PR #${p.number}: ${p.head.ref} (${p.head.sha.substr(0,8)}) by ${p.user.login}`));
             return { found: false, reason: 'No matching PR found' };
           }
           
@@ -246,15 +237,7 @@ jobs:
         echo "🐛 Debug: Auto-merge workflow triggered but no Dependabot PR found"
         echo "📋 Event: ${{ github.event_name }}"
         echo "🔍 Reason: ${{ fromJSON(steps.find-pr.outputs.result).reason }}"
-        
-        if [ "${{ github.event_name }}" = "workflow_run" ]; then
-          echo "📊 Workflow run details:"
-          echo "  - Conclusion: ${{ github.event.workflow_run.conclusion }}"
-          echo "  - Head SHA: ${{ github.event.workflow_run.head_sha }}"
-          echo "  - Head branch: ${{ github.event.workflow_run.head_branch }}"
-        elif [ "${{ github.event_name }}" = "check_suite" ]; then
-          echo "📊 Check suite details:"
-          echo "  - Conclusion: ${{ github.event.check_suite.conclusion }}"
-          echo "  - Head SHA: ${{ github.event.check_suite.head_sha }}"
-          echo "  - Head branch: ${{ github.event.check_suite.head_branch }}"
-        fi
+        echo "📊 Workflow run details:"
+        echo "  - Conclusion: ${{ github.event.workflow_run.conclusion }}"
+        echo "  - Head SHA: ${{ github.event.workflow_run.head_sha }}"
+        echo "  - Head branch: ${{ github.event.workflow_run.head_branch }}"
