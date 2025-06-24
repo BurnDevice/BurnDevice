@@ -19,9 +19,22 @@ updates:
     labels:
       - "dependencies"
       - "go"
+      - "auto-merge"
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -41,6 +54,14 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+      - "auto-merge"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Docker
   - package-ecosystem: "docker"
@@ -59,4 +80,12 @@ updates:
       include: "scope"
     labels:
       - "dependencies"
-      - "docker" 
+      - "docker"
+      - "auto-merge"
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch" 
