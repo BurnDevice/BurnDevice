@@ -1,188 +1,99 @@
-name: 🚀 Release
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
 
-env:
-  GO_VERSION: '1.24'
-  BUF_VERSION: '1.55.1'
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  # 构建和发布
-  release:
-    name: 🚀 Build and Release
+  create-release:
+    name: 创建 GitHub Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
-
-    - name: Setup Buf
-      uses: bufbuild/buf-setup-action@v1
-      with:
-        version: ${{ env.BUF_VERSION }}
-
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-
-    - name: Get version
+    - name: 获取版本信息
       id: version
-      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-    - name: Generate changelog
-      id: changelog
       run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+        
         # 获取上一个标签
         PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-        
-        # 生成变更日志
-        if [ -n "$PREV_TAG" ]; then
-          echo "## 🔥 What's Changed" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          git log --pretty=format:"- %s (%h)" ${PREV_TAG}..HEAD >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.version.outputs.version }}" >> CHANGELOG.md
-        else
-          echo "## 🔥 Initial Release" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "This is the first release of BurnDevice!" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "### 新增功能" >> CHANGELOG.md
-          echo "- 🔥 BurnDevice核心功能" >> CHANGELOG.md
-          echo "- 🏗️ 完整的架构设计" >> CHANGELOG.md
-          echo "- 🤖 AI驱动功能" >> CHANGELOG.md
-          echo "- 🔒 安全控制机制" >> CHANGELOG.md
-          echo "- 🐳 容器化支持" >> CHANGELOG.md
-          echo "- 📊 监控和日志系统" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "### 安装方法" >> CHANGELOG.md
-          echo "请从Release页面下载对应平台的二进制文件。" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "### 注意事项" >> CHANGELOG.md
-          echo "⚠️ 此工具仅用于授权测试环境，请勿在生产环境使用！" >> CHANGELOG.md
-        fi
+        echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
 
-    - name: Download dependencies
-      run: go mod download
-
-    - name: Generate protobuf code
-      run: buf generate
-
-    - name: Build binaries
+    - name: 生成更新日志
+      id: changelog
       run: |
-        platforms="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
-        for platform in $platforms; do
-          GOOS=${platform%/*}
-          GOARCH=${platform#*/}
-          output_name="burndevice-${GOOS}-${GOARCH}"
-          if [ "$GOOS" = "windows" ]; then
-            output_name="${output_name}.exe"
-          fi
-          
-          echo "Building for $GOOS/$GOARCH..."
-          GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build \
-            -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }} -X main.commit=${{ github.sha }} -X main.date=$(date -u '+%Y-%m-%d_%H:%M:%S')" \
-            -o $output_name ./cmd/burndevice
-          
-          # 创建压缩包
-          if [ "$GOOS" = "windows" ]; then
-            zip ${output_name%.*}.zip $output_name
-            rm $output_name
-          else
-            tar -czf ${output_name}.tar.gz $output_name
-            rm $output_name
-          fi
-        done
+        VERSION=${{ steps.version.outputs.version }}
+        PREV_TAG=${{ steps.version.outputs.prev_tag }}
+        
+        echo "## 🔥 BurnDevice $VERSION" > CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "### 📈 改进" >> CHANGELOG.tmp
+        
+        if [ -n "$PREV_TAG" ]; then
+          echo "**完整更新日志**: [\`$PREV_TAG...$VERSION\`](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION)" >> CHANGELOG.tmp
+          echo "" >> CHANGELOG.tmp
+          echo "### 🔄 提交记录" >> CHANGELOG.tmp
+          git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> CHANGELOG.tmp
+        else
+          echo "- 🎉 首次发布" >> CHANGELOG.tmp
+          echo "- ⚡ 高性能设备烧录工具" >> CHANGELOG.tmp
+          echo "- 🔧 支持多种设备类型" >> CHANGELOG.tmp
+          echo "- 🌐 gRPC API 支持" >> CHANGELOG.tmp
+          echo "- 🤖 AI 辅助功能" >> CHANGELOG.tmp
+        fi
+        
+        echo "" >> CHANGELOG.tmp
+        echo "### 📦 安装方式" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "#### 直接下载" >> CHANGELOG.tmp
+        echo "从下方 Assets 下载对应平台的二进制文件" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "#### 使用脚本安装" >> CHANGELOG.tmp
+        echo "\`\`\`bash" >> CHANGELOG.tmp
+        echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash" >> CHANGELOG.tmp
+        echo "\`\`\`" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "#### Docker" >> CHANGELOG.tmp
+        echo "\`\`\`bash" >> CHANGELOG.tmp
+        echo "docker run --rm -it burndevice/burndevice:${{ steps.version.outputs.version_number }}" >> CHANGELOG.tmp
+        echo "\`\`\`" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "### 🔍 验证安装" >> CHANGELOG.tmp
+        echo "\`\`\`bash" >> CHANGELOG.tmp
+        echo "burndevice --version" >> CHANGELOG.tmp
+        echo "\`\`\`" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "---" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "**注意**: 发布包正在上传中，请稍等片刻..." >> CHANGELOG.tmp
 
-    - name: Create Release
+    - name: 创建 GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.version.outputs.version }}
-        name: 🔥 BurnDevice ${{ steps.version.outputs.version }}
-        body_path: CHANGELOG.md
+        name: "🔥 BurnDevice ${{ steps.version.outputs.version }}"
+        body_path: CHANGELOG.tmp
         draft: false
         prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-        files: |
-          *.tar.gz
-          *.zip
+        make_latest: true
+        generate_release_notes: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 构建和发布Docker镜像
-  docker:
-    name: 🐳 Build Docker
-    runs-on: ubuntu-latest
-    needs: release
-    permissions:
-      contents: read
-      packages: write
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Login to Docker Hub
-      if: secrets.DOCKERHUB_USERNAME != ''
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Get version
-      id: version
-      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: |
-          ghcr.io/${{ github.repository }}
-          ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/{1}', secrets.DOCKERHUB_USERNAME, github.event.repository.name) || '' }}
-        tags: |
-          type=ref,event=tag
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
-          type=raw,value=latest,enable={{is_default_branch}}
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        build-args: |
-          VERSION=${{ steps.version.outputs.version }}
-          COMMIT=${{ github.sha }}
-          DATE=${{ github.event.head_commit.timestamp }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max 
+    - name: 输出信息
+      run: |
+        echo "🎉 Release ${{ steps.version.outputs.version }} 已创建！"
+        echo "📋 Release 页面: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
+        echo "⏰ 等待 Make 命令上传发布包..." 

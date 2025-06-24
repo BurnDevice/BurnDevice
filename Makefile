@@ -198,8 +198,8 @@ clean: ## Clean build artifacts
 clean-all: clean ## Clean everything including dependencies
 	go clean -modcache
 
-# Release management - 简化版本
-.PHONY: release-check release-build release-tag release-test
+# Release management - 最佳实践版本
+.PHONY: release-check release-build release-tag release-upload release-test
 
 # 发布前检查
 release-check: ## 发布前检查
@@ -209,7 +209,7 @@ release-check: ## 发布前检查
 	@make test-short
 	@echo "✅ 检查通过"
 
-# 构建发布包（本地测试用）
+# 构建发布包
 release-build: clean ## 构建发布包
 	@if [ -z "$(VERSION)" ]; then \
 		echo "❌ 请指定版本: make release-build VERSION=v1.0.0"; \
@@ -242,17 +242,34 @@ release-tag: release-check ## 创建并推送发布标签
 	@git tag -a $(VERSION) -m "🔥 Release $(VERSION)"
 	@echo "📤 推送标签到远程仓库..."
 	@git push origin $(VERSION)
+	@echo "✅ 标签 $(VERSION) 已创建并推送！"
+	@echo "⏰ GitHub Actions 正在创建 Release 页面..."
+
+# 等待GitHub Actions创建release并上传本地构建的包
+release-upload: release-build release-tag ## 上传发布包到GitHub Release
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ 请指定版本: make release-upload VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@echo "⏳ 等待 GitHub Actions 创建 Release..."
+	@for i in {1..30}; do \
+		if gh release view $(VERSION) >/dev/null 2>&1; then \
+			echo "✅ Release $(VERSION) 已创建"; \
+			break; \
+		fi; \
+		echo "等待中... ($$i/30)"; \
+		sleep 10; \
+	done
+	@if ! gh release view $(VERSION) >/dev/null 2>&1; then \
+		echo "❌ GitHub Actions 创建 Release 超时，请手动检查"; \
+		echo "📋 Actions: https://github.com/BurnDevice/BurnDevice/actions"; \
+		exit 1; \
+	fi
+	@echo "📦 上传本地构建的发布包..."
+	@gh release upload $(VERSION) release/*.tar.gz --clobber
 	@echo ""
-	@echo "🎉 标签 $(VERSION) 已创建并推送！"
-	@echo "⏰ GitHub Actions 将自动："
-	@echo "   - 创建 GitHub Release"
-	@echo "   - 构建多平台二进制文件"
-	@echo "   - 构建 Docker 镜像"
-	@echo "   - 发布到包管理器"
-	@echo ""
-	@echo "📋 查看进度："
-	@echo "   - Actions: https://github.com/BurnDevice/BurnDevice/actions"
-	@echo "   - Release: https://github.com/BurnDevice/BurnDevice/releases"
+	@echo "🎉 发布完成!"
+	@echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"
 
 # 一键发布 (推荐使用)
 release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
@@ -273,12 +290,14 @@ release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
 		echo ""; \
 		echo "发布流程:"; \
 		echo "  1. 发布前检查（代码格式、测试等）"; \
-		echo "  2. 创建并推送 Git 标签"; \
-		echo "  3. GitHub Actions 自动构建和发布"; \
+		echo "  2. 构建多平台二进制文件"; \
+		echo "  3. 创建并推送 Git 标签"; \
+		echo "  4. 等待 GitHub Actions 创建 Release"; \
+		echo "  5. 上传本地构建的发布包"; \
 		echo ""; \
 		exit 1; \
 	fi
-	@make release-tag VERSION=$(VERSION)
+	@make release-upload VERSION=$(VERSION)
 
 # 版本信息
 version-current: ## 显示当前版本
