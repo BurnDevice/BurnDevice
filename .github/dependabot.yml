@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Go modules
+  # Go modules - Updated to trigger rescan on 2025-06-24
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
