@@ -45,62 +45,186 @@ BurnDevice 是一个专为**授权测试环境**设计的破坏性测试工具�
 
 ## 📦 安装和使用
 
-### 1. 使用 Nix Flakes (推荐)
+### 🚀 快速开始
+
+#### 二进制安装 (推荐)
+
+从 [GitHub Releases](https://github.com/BurnDevice/BurnDevice/releases) 下载最新版本：
+
+```bash
+# Linux (x86_64)
+curl -L https://github.com/BurnDevice/BurnDevice/releases/latest/download/burndevice-linux-amd64.tar.gz | tar -xz
+sudo mv burndevice /usr/local/bin/
+
+# macOS (Intel)
+curl -L https://github.com/BurnDevice/BurnDevice/releases/latest/download/burndevice-darwin-amd64.tar.gz | tar -xz
+sudo mv burndevice /usr/local/bin/
+
+# macOS (Apple Silicon)
+curl -L https://github.com/BurnDevice/BurnDevice/releases/latest/download/burndevice-darwin-arm64.tar.gz | tar -xz
+sudo mv burndevice /usr/local/bin/
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/BurnDevice/BurnDevice/releases/latest/download/burndevice-windows-amd64.zip" -OutFile "burndevice.zip"
+Expand-Archive -Path "burndevice.zip" -DestinationPath "."
+```
+
+#### Docker 安装
+
+```bash
+# 从 GitHub Container Registry
+docker pull ghcr.io/burndevice/burndevice:latest
+
+# 运行服务器
+docker run -p 8080:8080 ghcr.io/burndevice/burndevice:latest
+
+# 运行客户端
+docker run --rm ghcr.io/burndevice/burndevice:latest client --help
+```
+
+#### 从源码构建
+
+```bash
+# 克隆仓库
+git clone https://github.com/BurnDevice/BurnDevice.git
+cd BurnDevice
+
+# 使用 Nix (推荐)
+nix develop
+make build
+
+# 或使用 Go
+go mod download
+buf generate
+go build -o bin/burndevice ./cmd/burndevice
+```
+
+### 🔧 验证安装
+
+```bash
+burndevice --version
+```
+
+## 🎯 使用指南
+
+### 启动服务器
+
+```bash
+# 使用默认配置
+burndevice server
+
+# 使用自定义配置
+burndevice server --config /path/to/config.yaml
+
+# Docker 方式
+docker run -p 8080:8080 -v /path/to/config.yaml:/app/config/config.yaml ghcr.io/burndevice/burndevice:latest
+```
+
+### 客户端操作
+
+```bash
+# 获取系统信息
+burndevice client system-info
+
+# 执行破坏性测试 (需要确认)
+burndevice client execute \
+  --type FILE_DELETION \
+  --targets "/tmp/test.txt" \
+  --severity LOW \
+  --confirm
+
+# 生成AI攻击场景
+burndevice client generate-scenario \
+  --target "Ubuntu 22.04 test server" \
+  --max-severity MEDIUM
+
+# 流式监控测试过程
+burndevice client stream \
+  --type MEMORY_EXHAUSTION \
+  --targets "test-process" \
+  --severity LOW \
+  --confirm
+```
+
+## 📋 发布管理
+
+### 🏷️ 版本发布流程
+
+项目使用标准化的发布流程，支持语义化版本控制：
+
+```bash
+# 1. 检查发布准备
+make release-check
+
+# 2. 查看版本建议
+make version-current  # 显示当前版本
+make version-patch    # 建议补丁版本 (v1.0.1)
+make version-minor    # 建议次版本 (v1.1.0)  
+make version-major    # 建议主版本 (v2.0.0)
+
+# 3. 执行发布
+make release-tag VERSION=v1.0.0
+
+# 4. 本地测试构建 (可选)
+make release-local
+```
+
+### 📦 发布产物
+
+每次发布会自动生成：
+
+- **多平台二进制文件**: Linux (amd64/arm64), macOS (amd64/arm64), Windows (amd64)
+- **Docker镜像**: `ghcr.io/burndevice/burndevice:VERSION`
+- **源码归档**: 自动生成的tar.gz和zip文件
+- **校验和文件**: SHA256校验和
+- **发布说明**: 基于Git提交自动生成
+
+### 🔄 版本策略
+
+- **v1.0.0** - 稳定版本，向后兼容
+- **v1.1.0** - 新功能版本，向后兼容
+- **v1.0.1** - 补丁版本，bug修复
+- **v1.0.0-alpha.1** - 预发布版本，用于测试
+
+## 🛠️ 开发环境
+
+### Nix Flake 开发环境 (推荐)
 
 ```bash
 # 进入开发环境
 nix develop
 
-# 生成 Protocol Buffers 代码
-buf generate
-
-# 构建项目
-make build
-
-# 查看帮助
+# 查看可用工具
 make help
 ```
 
-### 2. 传统 Go 环境
+### 传统开发环境
+
+确保安装以下工具：
+- Go 1.24+
+- Protocol Buffers 编译器
+- Buf CLI
+- Make
+
+### 开发工作流
 
 ```bash
-# 确保安装了 Go 1.24+ 和 protoc
-go version
-protoc --version
+# 代码质量检查
+make quality-check
 
-# 克隆项目
-git clone https://github.com/BurnDevice/BurnDevice.git
-cd BurnDevice
+# 运行测试
+make test
+make test-race
+make test-coverage
 
-# 安装依赖
-go mod download
+# 安全检查
+make security-check
 
-# 生成代码和构建
-make dev-setup
-make build
-```
+# 构建所有平台
+make build-all
 
-### 3. 配置
-
-```bash
-# 复制示例配置
-cp config.example.yaml config.yaml
-
-# 编辑配置文件
-nvim config.yaml
-
-# 设置环境变量
-export BURNDEVICE_AI_API_KEY="your-deepseek-api-key"
-```
-
-### 4. 运行
-
-```bash
-# 启动服务器
-./bin/burndevice server --config config.yaml
-
-# 在另一个终端中使用客户端
-./bin/burndevice client --help
+# 开发模式运行
+make run-dev
 ```
 
 ## 🎯 使用示例

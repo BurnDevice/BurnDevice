@@ -209,6 +209,94 @@ release: clean build-all ## Create release artifacts
 	zip -j release/burndevice-$(VERSION)-windows-amd64.zip bin/$(BINARY_NAME)-windows-amd64.exe
 	@echo "📦 Release artifacts created in release/ directory"
 
+# Release management
+.PHONY: release-check release-tag release-local version-patch version-minor version-major
+
+release-check: ## Pre-release checks
+	@echo "🔍 Running pre-release checks..."
+	@echo "1. Checking git status..."
+	@git diff --quiet || (echo "❌ Working directory is dirty" && exit 1)
+	@git diff --cached --quiet || (echo "❌ Staged changes found" && exit 1)
+	@echo "2. Checking current branch..."
+	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "main" ] || (echo "❌ Not on main branch, current: $$(git rev-parse --abbrev-ref HEAD)" && exit 1)
+	@echo "3. Checking for unpushed commits..."
+	@git fetch origin main
+	@[ "$$(git rev-list HEAD...origin/main --count)" = "0" ] || (echo "❌ Local commits not pushed to origin/main" && exit 1)
+	@echo "4. Running full CI pipeline..."
+	@make ci
+	@echo "✅ All pre-release checks passed"
+
+release-tag: release-check ## Create and push release tag
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ Usage: make release-tag VERSION=v1.0.0"; \
+		echo ""; \
+		echo "📋 Version format examples:"; \
+		echo "  - Major release: v1.0.0"; \
+		echo "  - Minor release: v1.1.0"; \
+		echo "  - Patch release: v1.0.1"; \
+		echo "  - Pre-release: v1.0.0-alpha.1, v1.0.0-beta.1, v1.0.0-rc.1"; \
+		exit 1; \
+	fi
+	@echo "🏷️ Creating release tag $(VERSION)..."
+	@git tag -a "$(VERSION)" -m "🔥 Release $(VERSION)"
+	@git push origin "$(VERSION)"
+	@echo ""
+	@echo "✅ Release $(VERSION) tagged and pushed!"
+	@echo "📦 GitHub Actions: https://github.com/BurnDevice/BurnDevice/actions"
+	@echo "📋 Release page: https://github.com/BurnDevice/BurnDevice/releases"
+	@echo ""
+	@echo "⏰ Expected completion: 5-10 minutes"
+	@echo "🎯 Release artifacts will include:"
+	@echo "   - Multi-platform binaries (Linux, macOS, Windows)"
+	@echo "   - Docker images (ghcr.io/burndevice/burndevice:$(VERSION))"
+	@echo "   - Source code archives"
+
+release-local: clean build-all ## Create local release artifacts for testing
+	@echo "📦 Creating local release artifacts..."
+	@mkdir -p release
+	@cp bin/* release/ 2>/dev/null || true
+	@cd release && \
+		for file in burndevice-*; do \
+			if [[ "$$file" == *".exe" ]]; then \
+				zip "$${file%.*}.zip" "$$file" && rm "$$file"; \
+			else \
+				tar -czf "$${file}.tar.gz" "$$file" && rm "$$file"; \
+			fi; \
+		done
+	@echo "✅ Local release artifacts created in release/"
+	@ls -la release/
+
+# Version helpers
+version-current: ## Show current version
+	@echo "Current version: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')"
+
+version-patch: ## Suggest next patch version
+	@echo "Current: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')"
+	@echo "Next patch: $$(git describe --tags --abbrev=0 2>/dev/null | sed 's/v//' | awk -F. '{print "v" $$1 "." $$2 "." $$3+1}' || echo 'v0.0.1')"
+
+version-minor: ## Suggest next minor version  
+	@echo "Current: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')"
+	@echo "Next minor: $$(git describe --tags --abbrev=0 2>/dev/null | sed 's/v//' | awk -F. '{print "v" $$1 "." $$2+1 ".0"}' || echo 'v0.1.0')"
+
+version-major: ## Suggest next major version
+	@echo "Current: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')"
+	@echo "Next major: $$(git describe --tags --abbrev=0 2>/dev/null | sed 's/v//' | awk -F. '{print "v" $$1+1 ".0.0"}' || echo 'v1.0.0')"
+
+# GoReleaser support (optional, for future use)
+goreleaser-check: ## Check GoReleaser configuration
+	@if command -v goreleaser >/dev/null 2>&1; then \
+		goreleaser check; \
+	else \
+		echo "⚠️  GoReleaser not installed, skipping check"; \
+	fi
+
+goreleaser-snapshot: ## Build snapshot release with GoReleaser
+	@if command -v goreleaser >/dev/null 2>&1; then \
+		goreleaser release --snapshot --clean; \
+	else \
+		echo "⚠️  GoReleaser not installed, use 'make release-local' instead"; \
+	fi
+
 # Generate example scenarios
 generate-example: build ## Generate example attack scenarios
 	mkdir -p examples

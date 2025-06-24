@@ -33,6 +33,7 @@
             neovim
             nixfmt-rfc-style
             gh
+            goreleaser
             # Security scanning tools
             gosec
             govulncheck

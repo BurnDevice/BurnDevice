@@ -1,0 +1,120 @@
+# GoReleaser配置文件
+# 用于专业化的发布流程，可选使用
+# 使用方法: goreleaser release --clean
+
+project_name: burndevice
+
+# 构建前的准备工作
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+    - buf generate
+
+# 构建配置
+builds:
+  - id: burndevice
+    binary: burndevice
+    main: ./cmd/burndevice
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # Windows不支持ARM64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    flags:
+      - -trimpath
+
+# 打包配置
+archives:
+  - id: burndevice
+    builds:
+      - burndevice
+    name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - config.example.yaml
+
+# 校验和
+checksum:
+  name_template: "{{ .ProjectName }}-{{ .Version }}-checksums.txt"
+  algorithm: sha256
+
+# 快照版本配置
+snapshot:
+  name_template: "{{ .Version }}-SNAPSHOT-{{ .ShortCommit }}"
+
+# 变更日志配置
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^build:"
+      - "^style:"
+      - "^refactor:"
+      - "^chore:"
+  groups:
+    - title: "🚀 新功能"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: "🐛 Bug修复"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: "🔒 安全更新"
+      regexp: "^.*sec[(\\w)]*:+.*$"
+      order: 2
+    - title: "⚡ 性能优化"
+      regexp: "^.*perf[(\\w)]*:+.*$"
+      order: 3
+    - title: "📚 文档更新"
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 4
+    - title: "🔧 其他更改"
+      order: 999
+
+# Docker镜像配置
+dockers:
+  - image_templates:
+      - "ghcr.io/burndevice/burndevice:{{ .Tag }}"
+      - "ghcr.io/burndevice/burndevice:latest"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=🔥 Device destructive testing tool"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.licenses=MIT"
+
+# 发布配置
+release:
+  github:
+    owner: BurnDevice
+    name: BurnDevice
+  name_template: "🔥 BurnDevice {{ .Version }}"
+  prerelease: auto
+  mode: replace
+  draft: false 
