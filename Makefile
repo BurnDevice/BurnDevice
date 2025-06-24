@@ -199,7 +199,7 @@ clean-all: clean ## Clean everything including dependencies
 	go clean -modcache
 
 # Release management - 简化版本
-.PHONY: release-check release-build release-publish
+.PHONY: release-check release-build release-tag release-test
 
 # 发布前检查
 release-check: ## 发布前检查
@@ -209,7 +209,7 @@ release-check: ## 发布前检查
 	@make test-short
 	@echo "✅ 检查通过"
 
-# 构建发布包
+# 构建发布包（本地测试用）
 release-build: clean ## 构建发布包
 	@if [ -z "$(VERSION)" ]; then \
 		echo "❌ 请指定版本: make release-build VERSION=v1.0.0"; \
@@ -228,42 +228,31 @@ release-build: clean ## 构建发布包
 	@echo "✅ 发布包构建完成:"
 	@ls -la release/
 
-# 发布到GitHub
-release-publish: release-check release-build ## 发布到GitHub
+# 创建并推送标签（触发GitHub Actions）
+release-tag: release-check ## 创建并推送发布标签
 	@if [ -z "$(VERSION)" ]; then \
-		echo "❌ 请指定版本: make release-publish VERSION=v1.0.0"; \
+		echo "❌ 请指定版本: make release-tag VERSION=v1.0.0"; \
 		exit 1; \
 	fi
-	@echo "🚀 发布 $(VERSION)..."
-	@echo "📝 创建发布说明..."
-	@echo "## 🔥 BurnDevice $(VERSION)" > /tmp/release-notes.md
-	@echo "" >> /tmp/release-notes.md
-	@echo "### 新增功能" >> /tmp/release-notes.md
-	@echo "- 🔥 BurnDevice核心功能" >> /tmp/release-notes.md
-	@echo "- 🏗️ 完整的架构设计" >> /tmp/release-notes.md
-	@echo "- 🤖 AI驱动功能" >> /tmp/release-notes.md
-	@echo "- 🔒 安全控制机制" >> /tmp/release-notes.md
-	@echo "- 🐳 容器化支持" >> /tmp/release-notes.md
-	@echo "- 📊 监控和日志系统" >> /tmp/release-notes.md
-	@echo "" >> /tmp/release-notes.md
-	@echo "### 安装方法" >> /tmp/release-notes.md
-	@echo "请从Release页面下载对应平台的二进制文件。" >> /tmp/release-notes.md
-	@echo "" >> /tmp/release-notes.md
-	@echo "### 注意事项" >> /tmp/release-notes.md
-	@echo "⚠️ 此工具仅用于授权测试环境，请勿在生产环境使用！" >> /tmp/release-notes.md
-	@echo "🏷️ 创建Git标签..."
-	@git tag $(VERSION)
+	@echo "🏷️ 创建发布标签 $(VERSION)..."
+	@if git tag -l | grep -q "^$(VERSION)$$"; then \
+		echo "❌ 标签 $(VERSION) 已存在"; \
+		exit 1; \
+	fi
+	@git tag -a $(VERSION) -m "🔥 Release $(VERSION)"
+	@echo "📤 推送标签到远程仓库..."
 	@git push origin $(VERSION)
-	@echo "📦 创建GitHub Release..."
-	@gh release create $(VERSION) \
-		--title "🔥 BurnDevice $(VERSION)" \
-		--notes-file /tmp/release-notes.md \
-		release/*.tar.gz
-	@rm -f /tmp/release-notes.md
 	@echo ""
-	@echo "🎉 发布完成!"
-	@echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"
-	@echo "⏰ GitHub Actions将自动构建Docker镜像和其他资源"
+	@echo "🎉 标签 $(VERSION) 已创建并推送！"
+	@echo "⏰ GitHub Actions 将自动："
+	@echo "   - 创建 GitHub Release"
+	@echo "   - 构建多平台二进制文件"
+	@echo "   - 构建 Docker 镜像"
+	@echo "   - 发布到包管理器"
+	@echo ""
+	@echo "📋 查看进度："
+	@echo "   - Actions: https://github.com/BurnDevice/BurnDevice/actions"
+	@echo "   - Release: https://github.com/BurnDevice/BurnDevice/releases"
 
 # 一键发布 (推荐使用)
 release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
@@ -282,9 +271,14 @@ release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
 		echo ""; \
 		echo "当前版本: $$(git describe --tags --abbrev=0 2>/dev/null || echo '未找到标签')"; \
 		echo ""; \
+		echo "发布流程:"; \
+		echo "  1. 发布前检查（代码格式、测试等）"; \
+		echo "  2. 创建并推送 Git 标签"; \
+		echo "  3. GitHub Actions 自动构建和发布"; \
+		echo ""; \
 		exit 1; \
 	fi
-	@make release-publish VERSION=$(VERSION)
+	@make release-tag VERSION=$(VERSION)
 
 # 版本信息
 version-current: ## 显示当前版本
@@ -298,6 +292,17 @@ release-test: release-build ## 本地测试发布包
 		./burndevice-linux-amd64 --version && \
 		rm burndevice-linux-amd64
 	@echo "✅ 发布包测试通过"
+
+# 删除标签（用于重新发布）
+release-delete-tag: ## 删除指定标签 (使用方法: make release-delete-tag VERSION=v1.0.0)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ 请指定版本: make release-delete-tag VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@echo "🗑️ 删除标签 $(VERSION)..."
+	@git tag -d $(VERSION) || true
+	@git push origin :refs/tags/$(VERSION) || true
+	@echo "✅ 标签 $(VERSION) 已删除"
 
 # Generate example scenarios
 generate-example: build ## Generate example attack scenarios

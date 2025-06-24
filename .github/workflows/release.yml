@@ -10,85 +10,18 @@ env:
   BUF_VERSION: '1.55.1'
 
 jobs:
-  # 创建GitHub Release
-  create-release:
-    name: 📦 Create Release
+  # 构建和发布
+  release:
+    name: 🚀 Build and Release
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
+    permissions:
+      contents: write
+      packages: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Get version
-      id: get_version
-      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-    - name: Generate changelog
-      id: changelog
-      run: |
-        # 获取上一个标签
-        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-        
-        # 生成变更日志
-        if [ -n "$PREV_TAG" ]; then
-          echo "## 🔥 What's Changed" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          git log --pretty=format:"- %s (%h)" ${PREV_TAG}..HEAD >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.get_version.outputs.version }}" >> CHANGELOG.md
-        else
-          echo "## 🔥 Initial Release" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "This is the first release of BurnDevice!" >> CHANGELOG.md
-        fi
-        
-        # 输出到GitHub Actions
-        echo "changelog<<EOF" >> $GITHUB_OUTPUT
-        cat CHANGELOG.md >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-
-    - name: Create Release
-      id: create_release
-      uses: softprops/action-gh-release@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.get_version.outputs.version }}
-        name: 🔥 BurnDevice ${{ steps.get_version.outputs.version }}
-        body: ${{ steps.changelog.outputs.changelog }}
-        draft: false
-        prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
-
-  # 构建多平台二进制文件
-  build-binaries:
-    name: 🏗️ Build Binaries
-    runs-on: ubuntu-latest
-    needs: create-release
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            asset_name: burndevice-linux-amd64
-          - goos: linux
-            goarch: arm64
-            asset_name: burndevice-linux-arm64
-          - goos: darwin
-            goarch: amd64
-            asset_name: burndevice-darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            asset_name: burndevice-darwin-arm64
-          - goos: windows
-            goarch: amd64
-            asset_name: burndevice-windows-amd64.exe
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
 
     - name: Setup Go
       uses: actions/setup-go@v5
@@ -110,46 +43,96 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
+    - name: Get version
+      id: version
+      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # 获取上一个标签
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        # 生成变更日志
+        if [ -n "$PREV_TAG" ]; then
+          echo "## 🔥 What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --pretty=format:"- %s (%h)" ${PREV_TAG}..HEAD >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.version.outputs.version }}" >> CHANGELOG.md
+        else
+          echo "## 🔥 Initial Release" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "This is the first release of BurnDevice!" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "### 新增功能" >> CHANGELOG.md
+          echo "- 🔥 BurnDevice核心功能" >> CHANGELOG.md
+          echo "- 🏗️ 完整的架构设计" >> CHANGELOG.md
+          echo "- 🤖 AI驱动功能" >> CHANGELOG.md
+          echo "- 🔒 安全控制机制" >> CHANGELOG.md
+          echo "- 🐳 容器化支持" >> CHANGELOG.md
+          echo "- 📊 监控和日志系统" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "### 安装方法" >> CHANGELOG.md
+          echo "请从Release页面下载对应平台的二进制文件。" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "### 注意事项" >> CHANGELOG.md
+          echo "⚠️ 此工具仅用于授权测试环境，请勿在生产环境使用！" >> CHANGELOG.md
+        fi
+
     - name: Download dependencies
       run: go mod download
 
     - name: Generate protobuf code
       run: buf generate
 
-    - name: Build binary
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 0
+    - name: Build binaries
       run: |
-        go build -ldflags="-s -w -X main.version=${{ needs.create-release.outputs.version }} -X main.commit=${{ github.sha }} -X main.date=$(date -u '+%Y-%m-%d_%H:%M:%S')" \
-          -o ${{ matrix.asset_name }} ./cmd/burndevice
+        platforms="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+        for platform in $platforms; do
+          GOOS=${platform%/*}
+          GOARCH=${platform#*/}
+          output_name="burndevice-${GOOS}-${GOARCH}"
+          if [ "$GOOS" = "windows" ]; then
+            output_name="${output_name}.exe"
+          fi
+          
+          echo "Building for $GOOS/$GOARCH..."
+          GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build \
+            -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }} -X main.commit=${{ github.sha }} -X main.date=$(date -u '+%Y-%m-%d_%H:%M:%S')" \
+            -o $output_name ./cmd/burndevice
+          
+          # 创建压缩包
+          if [ "$GOOS" = "windows" ]; then
+            zip ${output_name%.*}.zip $output_name
+            rm $output_name
+          else
+            tar -czf ${output_name}.tar.gz $output_name
+            rm $output_name
+          fi
+        done
 
-    - name: Create archive
-      run: |
-        if [[ "${{ matrix.goos }}" == "windows" ]]; then
-          zip ${{ matrix.asset_name }}.zip ${{ matrix.asset_name }}
-          echo "ASSET_PATH=${{ matrix.asset_name }}.zip" >> $GITHUB_ENV
-          echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
-        else
-          tar -czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
-          echo "ASSET_PATH=${{ matrix.asset_name }}.tar.gz" >> $GITHUB_ENV
-          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
-        fi
-
-    - name: Upload Release Asset
+    - name: Create Release
       uses: softprops/action-gh-release@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ needs.create-release.outputs.version }}
-        files: ${{ env.ASSET_PATH }}
+        tag_name: ${{ steps.version.outputs.version }}
+        name: 🔥 BurnDevice ${{ steps.version.outputs.version }}
+        body_path: CHANGELOG.md
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+        files: |
+          *.tar.gz
+          *.zip
 
   # 构建和发布Docker镜像
-  build-docker:
+  docker:
     name: 🐳 Build Docker
     runs-on: ubuntu-latest
-    needs: create-release
+    needs: release
+    permissions:
+      contents: read
+      packages: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -171,6 +154,10 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+    - name: Get version
+      id: version
+      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -183,7 +170,7 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
-          type=raw,value=latest
+          type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
@@ -194,61 +181,8 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
-          VERSION=${{ needs.create-release.outputs.version }}
+          VERSION=${{ steps.version.outputs.version }}
           COMMIT=${{ github.sha }}
           DATE=${{ github.event.head_commit.timestamp }}
         cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-  # 发布到包管理器
-  publish-packages:
-    name: 📦 Publish Packages
-    runs-on: ubuntu-latest
-    needs: [create-release, build-binaries]
-    if: ${{ !contains(needs.create-release.outputs.version, '-') }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
-
-    # 发布到Go模块代理（自动）
-    - name: Trigger Go module proxy
-      run: |
-        GOPROXY=https://proxy.golang.org go list -m github.com/${{ github.repository }}@${{ needs.create-release.outputs.version }}
-
-    # 生成Homebrew formula（如果需要）
-    - name: Generate Homebrew formula
-      if: secrets.HOMEBREW_TAP_TOKEN != ''
-      run: |
-        cat > burndevice.rb << EOF
-        class Burndevice < Formula
-          desc "🔥 Device destructive testing tool for authorized test environments"
-          homepage "https://github.com/${{ github.repository }}"
-          url "https://github.com/${{ github.repository }}/archive/${{ needs.create-release.outputs.version }}.tar.gz"
-          version "${{ needs.create-release.outputs.version }}"
-          license "MIT"
-
-          depends_on "go" => :build
-          depends_on "buf" => :build
-
-          def install
-            system "buf", "generate"
-            system "go", "build", *std_go_args(ldflags: "-s -w -X main.version=${{ needs.create-release.outputs.version }}"), "./cmd/burndevice"
-          end
-
-          test do
-            system "#{bin}/burndevice", "--version"
-          end
-        end
-        EOF
-
-    # 通知相关服务
-    - name: Notify release
-      run: |
-        echo "🎉 Release ${{ needs.create-release.outputs.version }} completed successfully!"
-        echo "📦 Binaries: $(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.assets[].browser_download_url')"
-        echo "🐳 Docker: ghcr.io/${{ github.repository }}:${{ needs.create-release.outputs.version }}" 
+        cache-to: type=gha,mode=max 
