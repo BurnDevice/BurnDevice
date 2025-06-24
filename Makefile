@@ -235,17 +235,35 @@ release-publish: release-check release-build ## 发布到GitHub
 		exit 1; \
 	fi
 	@echo "🚀 发布 $(VERSION)..."
+	@echo "📝 创建发布说明..."
+	@echo "## 🔥 BurnDevice $(VERSION)" > /tmp/release-notes.md
+	@echo "" >> /tmp/release-notes.md
+	@echo "### 新增功能" >> /tmp/release-notes.md
+	@echo "- 🔥 BurnDevice核心功能" >> /tmp/release-notes.md
+	@echo "- 🏗️ 完整的架构设计" >> /tmp/release-notes.md
+	@echo "- 🤖 AI驱动功能" >> /tmp/release-notes.md
+	@echo "- 🔒 安全控制机制" >> /tmp/release-notes.md
+	@echo "- 🐳 容器化支持" >> /tmp/release-notes.md
+	@echo "- 📊 监控和日志系统" >> /tmp/release-notes.md
+	@echo "" >> /tmp/release-notes.md
+	@echo "### 安装方法" >> /tmp/release-notes.md
+	@echo "请从Release页面下载对应平台的二进制文件。" >> /tmp/release-notes.md
+	@echo "" >> /tmp/release-notes.md
+	@echo "### 注意事项" >> /tmp/release-notes.md
+	@echo "⚠️ 此工具仅用于授权测试环境，请勿在生产环境使用！" >> /tmp/release-notes.md
+	@echo "🏷️ 创建Git标签..."
 	@git tag $(VERSION)
 	@git push origin $(VERSION)
-	@echo "⏳ 等待GitHub Actions构建..."
-	@sleep 10
-	@echo "📦 上传发布包..."
-	@gh release upload $(VERSION) release/*.tar.gz || \
-		(echo "⚠️ GitHub Release可能还未创建，请稍后手动上传" && \
-		 echo "📋 使用命令: gh release upload $(VERSION) release/*.tar.gz")
+	@echo "📦 创建GitHub Release..."
+	@gh release create $(VERSION) \
+		--title "🔥 BurnDevice $(VERSION)" \
+		--notes-file /tmp/release-notes.md \
+		release/*.tar.gz
+	@rm -f /tmp/release-notes.md
 	@echo ""
 	@echo "🎉 发布完成!"
 	@echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"
+	@echo "⏰ GitHub Actions将自动构建Docker镜像和其他资源"
 
 # 一键发布 (推荐使用)
 release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
