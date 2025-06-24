@@ -53,7 +53,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -o burndevice ./cmd/burndevice
 
 # Runtime stage
-FROM alpine:3.19
+FROM alpine:3.22
 
 # Install runtime dependencies
 RUN apk add --no-cache \
