@@ -12,7 +12,7 @@ RUN apk add --no-cache \
     unzip
 
 # Install buf for the target architecture
-ARG BUF_VERSION=1.28.1
+ARG BUF_VERSION=1.55.1
 ARG TARGETARCH
 RUN case ${TARGETARCH} in \
         amd64) BUF_ARCH=x86_64 ;; \
