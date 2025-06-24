@@ -1,42 +1,34 @@
-# golangci-lint configuration 
-# Optimized for CI compatibility and core quality checks
+# golangci-lint configuration for v2.x
+# Based on official documentation: https://golangci-lint.run/usage/configuration/
 
-# 版本兼容性配置 - 支持golangci-lint v2.x
-version: 2
+version: "2"
 
 run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
 
-output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-
 linters:
   enable:
-    # 核心质量检查 - 已测试有效
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
+    # 核心质量检查
+    - errcheck      # 检查未处理的错误
+    - govet         # 检查可疑构造
+    - ineffassign   # 检查未使用的赋值
+    - staticcheck   # 静态分析检查
+    - unused        # 检查未使用的常量、变量、函数和类型
+
+  exclusions:
+    # 排除测试文件和生成的protobuf文件
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - errcheck
+      - path: '(.+)\.pb\.go'
+        linters:
+          - errcheck
+          - staticcheck
+          - unused
 
 issues:
-  exclude-rules:
-    # 排除测试文件
-    - path: _test\.go
-      linters:
-        - errcheck
-    
-    # 排除生成的protobuf文件
-    - path: ".*\\.pb\\.go$"
-      linters:
-        - errcheck
-        - staticcheck
-        - unused
-
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0 
