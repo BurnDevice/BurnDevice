@@ -15,7 +15,6 @@ jobs:
     name: 📦 Create Release
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
     steps:
     - name: Checkout code
@@ -54,12 +53,12 @@ jobs:
 
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.get_version.outputs.version }}
-        release_name: 🔥 BurnDevice ${{ steps.get_version.outputs.version }}
+        name: 🔥 BurnDevice ${{ steps.get_version.outputs.version }}
         body: ${{ steps.changelog.outputs.changelog }}
         draft: false
         prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
@@ -139,14 +138,12 @@ jobs:
         fi
 
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ${{ env.ASSET_PATH }}
-        asset_name: ${{ env.ASSET_PATH }}
-        asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+        tag_name: ${{ needs.create-release.outputs.version }}
+        files: ${{ env.ASSET_PATH }}
 
   # 构建和发布Docker镜像
   build-docker:
