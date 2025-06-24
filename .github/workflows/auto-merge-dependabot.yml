@@ -1,66 +1,225 @@
 name: 🤖 Auto-merge Dependabot PRs
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-  pull_request_review:
-    types: [submitted]
+  # 只在所有检查完成后触发，不在 PR 创建时触发
   check_suite:
     types: [completed]
   status: {}
+  workflow_run:
+    workflows: ["🔥 BurnDevice CI"]
+    types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
   checks: read
+  actions: read
 
 jobs:
   auto-merge:
     name: 🔄 Auto-merge Dependabot PRs
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    # 只处理成功的工作流运行
+    if: |
+      github.actor == 'dependabot[bot]' && 
+      (github.event.check_suite.conclusion == 'success' || 
+       github.event.workflow_run.conclusion == 'success' ||
+       github.event.state == 'success')
     
     steps:
+    - name: 🔍 Find associated PR
+      id: find-pr
+      uses: actions/github-script@v7
+      with:
+        script: |
+          let pr_number = null;
+          let head_sha = null;
+          
+          // 从不同事件类型获取 SHA
+          if (context.eventName === 'workflow_run') {
+            head_sha = context.payload.workflow_run.head_sha;
+          } else if (context.eventName === 'check_suite') {
+            head_sha = context.payload.check_suite.head_sha;
+          } else if (context.eventName === 'status') {
+            head_sha = context.payload.sha;
+          }
+          
+          if (!head_sha) {
+            console.log('❌ Could not determine head SHA');
+            return { found: false };
+          }
+          
+          console.log(`🔍 Looking for PR with head SHA: ${head_sha}`);
+          
+          // 查找对应的 PR
+          const { data: prs } = await github.rest.pulls.list({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open'
+          });
+          
+          const pr = prs.find(pr => pr.head.sha === head_sha);
+          
+          if (!pr) {
+            console.log('❌ No open PR found for this SHA');
+            return { found: false };
+          }
+          
+          // 检查是否是 Dependabot PR
+          if (pr.user.login !== 'dependabot[bot]') {
+            console.log(`❌ PR is not from Dependabot (author: ${pr.user.login})`);
+            return { found: false };
+          }
+          
+          console.log(`✅ Found Dependabot PR #${pr.number}: ${pr.title}`);
+          return {
+            found: true,
+            number: pr.number,
+            title: pr.title,
+            head_sha: head_sha
+          };
+
+    - name: ✅ Verify all CI checks passed
+      id: check-status
+      if: steps.find-pr.outputs.result && fromJSON(steps.find-pr.outputs.result).found
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr_info = JSON.parse(`${{ steps.find-pr.outputs.result }}`);
+          const head_sha = pr_info.head_sha;
+          
+          console.log(`🔍 Checking CI status for SHA: ${head_sha}`);
+          
+          // 获取所有检查运行
+          const { data: checkRuns } = await github.rest.checks.listForRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: head_sha
+          });
+          
+          // 获取状态检查
+          const { data: statuses } = await github.rest.repos.listCommitStatusesForRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: head_sha
+          });
+          
+          // 定义必需的检查
+          const requiredChecks = [
+            '🔍 Code Quality',
+            '🛡️ Security Scan',
+            '🧪 Test',
+            '🏗️ Build'
+          ];
+          
+          let allChecksPassed = true;
+          let checkResults = [];
+          
+          // 检查每个必需的检查
+          for (const checkName of requiredChecks) {
+            const checkRun = checkRuns.check_runs.find(run => run.name === checkName);
+            
+            if (!checkRun) {
+              console.log(`❌ Required check '${checkName}' not found`);
+              allChecksPassed = false;
+              checkResults.push(`❌ ${checkName}: Not found`);
+              continue;
+            }
+            
+            if (checkRun.conclusion !== 'success') {
+              console.log(`❌ Check '${checkName}' failed: ${checkRun.conclusion}`);
+              allChecksPassed = false;
+              checkResults.push(`❌ ${checkName}: ${checkRun.conclusion}`);
+            } else {
+              console.log(`✅ Check '${checkName}' passed`);
+              checkResults.push(`✅ ${checkName}: success`);
+            }
+          }
+          
+          // 检查状态检查
+          const failedStatuses = statuses.filter(status => status.state === 'failure');
+          if (failedStatuses.length > 0) {
+            console.log(`❌ Found ${failedStatuses.length} failed status checks`);
+            allChecksPassed = false;
+            failedStatuses.forEach(status => {
+              checkResults.push(`❌ ${status.context}: ${status.state}`);
+            });
+          }
+          
+          console.log(`🎯 Overall CI status: ${allChecksPassed ? 'PASSED' : 'FAILED'}`);
+          
+          return {
+            all_passed: allChecksPassed,
+            check_results: checkResults,
+            pr_number: pr_info.number
+          };
+
     - name: 🔍 Fetch PR metadata
       id: metadata
+      if: |
+        steps.find-pr.outputs.result && 
+        fromJSON(steps.find-pr.outputs.result).found && 
+        fromJSON(steps.check-status.outputs.result).all_passed
       uses: dependabot/fetch-metadata@v2
       with:
         github-token: "${{ secrets.GITHUB_TOKEN }}"
-    
+
     - name: 🚀 Auto-merge safe updates
       if: |
         steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
         steps.metadata.outputs.update-type == 'version-update:semver-minor'
       run: |
+        PR_NUMBER="${{ fromJSON(steps.check-status.outputs.result).pr_number }}"
+        
+        echo "🎉 All CI checks passed! Proceeding with auto-merge..."
         echo "✅ Safe update detected: ${{ steps.metadata.outputs.update-type }}"
         echo "📦 Package: ${{ steps.metadata.outputs.dependency-names }}"
         echo "🔄 Version: ${{ steps.metadata.outputs.previous-version }} → ${{ steps.metadata.outputs.new-version }}"
-        echo "🔄 Enabling auto-merge for PR #${{ github.event.pull_request.number }}"
         
-        # 启用 auto-merge，等待所有检查通过后自动合并
-        gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
+        # 直接合并（不使用 --auto，因为我们已经验证了所有检查）
+        gh pr merge ${PR_NUMBER} --squash --delete-branch
         
-        echo "✨ Auto-merge enabled! PR will be merged automatically when all checks pass."
+        echo "🎉 PR #${PR_NUMBER} merged successfully and branch deleted!"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: 🛡️ Auto-merge security updates
-      if: contains(steps.metadata.outputs.dependency-names, 'security')
+      if: |
+        contains(steps.metadata.outputs.update-type, 'security') ||
+        contains(steps.metadata.outputs.dependency-names, 'security')
       run: |
-        echo "🛡️ Security update detected - enabling auto-merge"
+        PR_NUMBER="${{ fromJSON(steps.check-status.outputs.result).pr_number }}"
+        
+        echo "🛡️ Security update detected - merging immediately!"
         echo "📦 Package: ${{ steps.metadata.outputs.dependency-names }}"
-        gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
-        echo "✨ Security update will be auto-merged when CI passes!"
+        
+        # 直接合并安全更新
+        gh pr merge ${PR_NUMBER} --squash --delete-branch
+        
+        echo "🎉 Security update merged and branch deleted!"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: 📝 Comment on major updates
       if: steps.metadata.outputs.update-type == 'version-update:semver-major'
       run: |
-        gh pr comment ${{ github.event.pull_request.number }} --body "🚨 **Major version update detected!**
+        PR_NUMBER="${{ fromJSON(steps.check-status.outputs.result).pr_number }}"
+        CI_STATUS="${{ fromJSON(steps.check-status.outputs.result).all_passed }}"
+        
+        if [ "$CI_STATUS" = "true" ]; then
+          STATUS_MSG="✅ **All CI checks passed!** Ready for manual review and merge."
+          ACTION_MSG="This PR is ready to merge after manual review."
+        else
+          STATUS_MSG="❌ **Some CI checks failed.** Please review and fix issues first."
+          ACTION_MSG="Fix CI issues before proceeding with merge."
+        fi
+        
+        gh pr comment ${PR_NUMBER} --body "🚨 **Major version update detected!**
         
         📦 **Package**: ${{ steps.metadata.outputs.dependency-names }}
         🔄 **Update**: ${{ steps.metadata.outputs.previous-version }} → ${{ steps.metadata.outputs.new-version }}
+        
+        ${STATUS_MSG}
         
         **⚠️ Manual review required for major updates:**
         - Check breaking changes in changelog  
@@ -68,27 +227,45 @@ jobs:
         - Review test coverage for new features
         - Consider impact on API consumers
         
+        **CI Check Results:**
+        $(echo '${{ steps.check-status.outputs.result }}' | jq -r '.check_results[]' 2>/dev/null || echo 'CI status check failed')
+        
+        **${ACTION_MSG}**
+        
         **To merge after review:**
         \`\`\`bash
-        gh pr merge ${{ github.event.pull_request.number }} --squash --delete-branch
-        \`\`\`
-        
-        **To close if problematic:**
-        \`\`\`bash  
-        gh pr close ${{ github.event.pull_request.number }}
+        gh pr merge ${PR_NUMBER} --squash --delete-branch
         \`\`\`"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 单独的作业处理合并完成后的清理
-  post-merge:
-    name: 📝 Post-merge notifications
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true && github.actor == 'dependabot[bot]'
-    
-    steps:
-    - name: 🎉 Merge success notification
+    - name: ❌ Comment on CI failures
+      if: |
+        steps.find-pr.outputs.result && 
+        fromJSON(steps.find-pr.outputs.result).found && 
+        !fromJSON(steps.check-status.outputs.result).all_passed &&
+        steps.metadata.outputs.update-type != 'version-update:semver-major'
       run: |
-        echo "🎉 Dependabot PR #${{ github.event.pull_request.number }} successfully merged!"
-        echo "📦 Dependencies updated and branch cleaned up automatically."
-        echo "✨ Your project is now using the latest secure versions!" 
+        PR_NUMBER="${{ fromJSON(steps.check-status.outputs.result).pr_number }}"
+        
+        gh pr comment ${PR_NUMBER} --body "❌ **Auto-merge blocked - CI checks failed**
+        
+        📦 **Package**: ${{ steps.metadata.outputs.dependency-names || 'Unknown' }}
+        🔄 **Update Type**: ${{ steps.metadata.outputs.update-type || 'Unknown' }}
+        
+        **Failed Checks:**
+        $(echo '${{ steps.check-status.outputs.result }}' | jq -r '.check_results[] | select(startswith("❌"))' 2>/dev/null || echo 'Failed to parse check results')
+        
+        **This PR will be auto-merged once all CI checks pass.** ✨
+        
+        **Common fixes:**
+        1. Check CI logs for specific errors
+        2. Rebase if there are conflicts: \`@dependabot rebase\`
+        3. If issues persist, manual intervention may be needed
+        
+        **Manual merge after fixes:**
+        \`\`\`bash
+        gh pr merge ${PR_NUMBER} --squash --delete-branch
+        \`\`\`"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
