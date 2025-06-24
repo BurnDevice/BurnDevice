@@ -243,6 +243,7 @@ jobs:
       if: |
         steps.find-pr.outputs.result && 
         fromJSON(steps.find-pr.outputs.result).found && 
+        steps.check-status.outputs.result &&
         !fromJSON(steps.check-status.outputs.result).all_passed &&
         steps.metadata.outputs.update-type != 'version-update:semver-major'
       run: |
