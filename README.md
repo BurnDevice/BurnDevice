@@ -1,11 +1,28 @@
-# 🔥 BurnDevice - 设备破坏性测试工具
+<div align="center">
+  <img src="assets/logo/BurnDevice-logo.svg" alt="BurnDevice Logo" width="160" height="160">
+  
+  <h1>🔥 BurnDevice</h1>
+  <p><strong>设备破坏性测试工具</strong></p>
+  
+  <p>
+    <a href="https://golang.org">
+      <img src="https://img.shields.io/badge/Go-1.24+-blue.svg" alt="Go Version">
+    </a>
+    <a href="coverage.out">
+      <img src="https://img.shields.io/badge/Coverage-53%25-yellow.svg" alt="Test Coverage">
+    </a>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+    </a>
+    <a href="docs/SECURITY.md">
+      <img src="https://img.shields.io/badge/Security-Research%20Only-red.svg" alt="Security">
+    </a>
+  </p>
+  
+  <p><em>专为<strong>授权测试环境</strong>设计的破坏性测试工具，用于评估系统的健壮性和恢复能力</em></p>
+</div>
 
-[![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)](https://golang.org)
-[![Test Coverage](https://img.shields.io/badge/Coverage-53%25-yellow.svg)](coverage.out)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Security](https://img.shields.io/badge/Security-Research%20Only-red.svg)](docs/SECURITY.md)
-
-BurnDevice 是一个专为**授权测试环境**设计的破坏性测试工具，用于评估系统的健壮性和恢复能力。
+---
 
 ## ⚠️ 重要安全警告
 
