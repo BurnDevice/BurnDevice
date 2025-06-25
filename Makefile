@@ -252,33 +252,120 @@ release-upload: release-build release-tag ## 上传发布包到GitHub Release
 		exit 1; \
 	fi
 	@echo "⏳ 等待 GitHub Actions 创建 Release..."
-	@for i in {1..30}; do \
-		if gh release view $(VERSION) >/dev/null 2>&1; then \
-			echo "✅ Release $(VERSION) 已创建"; \
+	@echo "💡 提示：如果等待过程中断，可以手动运行："
+	@echo "   gh release upload $(VERSION) release/*.tar.gz --clobber"
+	@echo ""
+	@WAIT_COUNT=0; \
+	MAX_WAIT=60; \
+	RETRY_INTERVAL=5; \
+	SUCCESS=false; \
+	trap 'echo ""; echo "⚠️  等待被中断，但发布包已构建完成"; echo "💡 手动上传命令："; echo "   gh release upload $(VERSION) release/*.tar.gz --clobber"; exit 130' INT TERM; \
+	while [ $$WAIT_COUNT -lt $$MAX_WAIT ]; do \
+		if gh release view $(VERSION) --json state --jq '.state' 2>/dev/null | grep -q "published"; then \
+			echo "✅ Release $(VERSION) 已创建并发布！"; \
+			SUCCESS=true; \
+			break; \
+		elif gh release view $(VERSION) >/dev/null 2>&1; then \
+			echo "✅ Release $(VERSION) 已创建（可能仍在处理中）"; \
+			SUCCESS=true; \
 			break; \
 		fi; \
-		echo "等待中... ($$i/30)"; \
-		sleep 10; \
-	done
-	@if ! gh release view $(VERSION) >/dev/null 2>&1; then \
-		echo "❌ GitHub Actions 创建 Release 超时，请手动检查"; \
-		echo "📋 Actions: https://github.com/BurnDevice/BurnDevice/actions"; \
-		exit 1; \
+		WAIT_COUNT=$$((WAIT_COUNT + 1)); \
+		REMAINING=$$((MAX_WAIT - WAIT_COUNT)); \
+		printf "等待中... [%d/%d] (剩余 %d 秒)\r" $$WAIT_COUNT $$MAX_WAIT $$((REMAINING * RETRY_INTERVAL)); \
+		if [ $$((WAIT_COUNT % 12)) -eq 0 ] && [ $$WAIT_COUNT -gt 0 ]; then \
+			echo ""; \
+			echo "📋 检查 GitHub Actions 状态: https://github.com/BurnDevice/BurnDevice/actions"; \
+		fi; \
+		sleep $$RETRY_INTERVAL; \
+	done; \
+	echo ""; \
+	if [ "$$SUCCESS" = "false" ]; then \
+		echo "⏰ GitHub Actions 创建 Release 超时（等待了 $$((MAX_WAIT * RETRY_INTERVAL)) 秒）"; \
+		echo "📋 请检查 Actions 状态: https://github.com/BurnDevice/BurnDevice/actions"; \
+		echo ""; \
+		echo "💡 如果 Release 已创建，可以手动上传发布包："; \
+		echo "   gh release upload $(VERSION) release/*.tar.gz --clobber"; \
+		echo ""; \
+		read -p "是否继续尝试上传发布包？(y/N): " confirm; \
+		if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then \
+			echo "❌ 发布流程中止"; \
+			exit 1; \
+		fi; \
 	fi
 	@echo "📦 上传本地构建的发布包..."
-	@gh release upload $(VERSION) release/*.tar.gz --clobber
-	@echo ""
-	@echo "🎉 发布完成!"
-	@echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"
+	@if gh release upload $(VERSION) release/*.tar.gz --clobber; then \
+		echo ""; \
+		echo "🎉 发布完成!"; \
+		echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"; \
+		echo "🔍 验证安装: curl -fsSL https://github.com/BurnDevice/BurnDevice/releases/download/$(VERSION)/burndevice-$(VERSION)-linux-amd64.tar.gz | tar -xz"; \
+	else \
+		echo ""; \
+		echo "❌ 上传发布包失败"; \
+		echo "💡 请手动上传："; \
+		echo "   gh release upload $(VERSION) release/*.tar.gz --clobber"; \
+		exit 1; \
+	fi
+
+# 快速发布（不等待GitHub Actions，直接尝试上传）
+release-quick: release-build release-tag ## 快速发布（跳过等待，直接尝试上传）
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ 请指定版本: make release-quick VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@echo "🚀 快速发布模式：跳过等待，直接尝试上传..."
+	@sleep 10  # 给GitHub Actions一点时间
+	@echo "📦 尝试上传发布包..."
+	@RETRY_COUNT=0; \
+	MAX_RETRY=6; \
+	while [ $$RETRY_COUNT -lt $$MAX_RETRY ]; do \
+		if gh release upload $(VERSION) release/*.tar.gz --clobber 2>/dev/null; then \
+			echo "✅ 发布包上传成功！"; \
+			echo "🎉 发布完成!"; \
+			echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"; \
+			exit 0; \
+		fi; \
+		RETRY_COUNT=$$((RETRY_COUNT + 1)); \
+		if [ $$RETRY_COUNT -lt $$MAX_RETRY ]; then \
+			echo "⏳ Release尚未创建，等待 10 秒后重试... ($$RETRY_COUNT/$$MAX_RETRY)"; \
+			sleep 10; \
+		fi; \
+	done; \
+	echo "❌ 快速上传失败，Release可能尚未创建"; \
+	echo "📋 请检查 GitHub Actions: https://github.com/BurnDevice/BurnDevice/actions"; \
+	echo "💡 稍后可手动上传："; \
+	echo "   gh release upload $(VERSION) release/*.tar.gz --clobber"
+
+# 仅上传发布包（假设Release已存在）
+release-assets-only: ## 仅上传发布包到已存在的Release
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ 请指定版本: make release-assets-only VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@if [ ! -d "release" ]; then \
+		echo "❌ 发布包目录不存在，请先运行: make release-build VERSION=$(VERSION)"; \
+		exit 1; \
+	fi
+	@echo "📦 上传发布包到 Release $(VERSION)..."
+	@if gh release upload $(VERSION) release/*.tar.gz --clobber; then \
+		echo "✅ 发布包上传成功！"; \
+		echo "📋 Release页面: https://github.com/BurnDevice/BurnDevice/releases/tag/$(VERSION)"; \
+	else \
+		echo "❌ 上传失败，请检查 Release 是否存在"; \
+		echo "📋 Release列表: gh release list"; \
+		exit 1; \
+	fi
 
 # 一键发布 (推荐使用)
 release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
 	@if [ -z "$(VERSION)" ]; then \
 		echo ""; \
-		echo "🚀 BurnDevice 一键发布"; \
+		echo "🚀 BurnDevice 发布工具"; \
 		echo ""; \
 		echo "使用方法:"; \
-		echo "  make release VERSION=v1.0.0"; \
+		echo "  make release VERSION=v1.0.0        # 标准发布（等待GitHub Actions）"; \
+		echo "  make release-quick VERSION=v1.0.0  # 快速发布（跳过等待）"; \
+		echo "  make release-assets-only VERSION=v1.0.0  # 仅上传发布包"; \
 		echo ""; \
 		echo "版本格式:"; \
 		echo "  主版本: v1.0.0"; \
@@ -288,12 +375,20 @@ release: ## 一键发布 (使用方法: make release VERSION=v1.0.0)
 		echo ""; \
 		echo "当前版本: $$(git describe --tags --abbrev=0 2>/dev/null || echo '未找到标签')"; \
 		echo ""; \
-		echo "发布流程:"; \
+		echo "发布选项说明:"; \
+		echo "  release       - 完整流程，等待GitHub Actions创建Release"; \
+		echo "  release-quick - 快速模式，跳过等待直接尝试上传"; \
+		echo "  release-assets-only - 仅上传发布包到已存在的Release"; \
+		echo ""; \
+		echo "标准发布流程:"; \
 		echo "  1. 发布前检查（代码格式、测试等）"; \
 		echo "  2. 构建多平台二进制文件"; \
 		echo "  3. 创建并推送 Git 标签"; \
 		echo "  4. 等待 GitHub Actions 创建 Release"; \
 		echo "  5. 上传本地构建的发布包"; \
+		echo ""; \
+		echo "💡 如果标准流程中断，可以使用:"; \
+		echo "   make release-assets-only VERSION=v1.0.0"; \
 		echo ""; \
 		exit 1; \
 	fi

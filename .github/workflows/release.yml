@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   create-release:
-    name: 创建 GitHub Release
+    name: Create GitHub Release
     runs-on: ubuntu-latest
     
     steps:
@@ -20,18 +20,18 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: 获取版本信息
+    - name: Get version info
       id: version
       run: |
         VERSION=${GITHUB_REF#refs/tags/}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
         
-        # 获取上一个标签
+        # Get previous tag
         PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
         echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
 
-    - name: 生成更新日志
+    - name: Generate changelog
       id: changelog
       run: |
         VERSION=${{ steps.version.outputs.version }}
@@ -79,7 +79,7 @@ jobs:
         echo "" >> CHANGELOG.tmp
         echo "**注意**: 发布包正在上传中，请稍等片刻..." >> CHANGELOG.tmp
 
-    - name: 创建 GitHub Release
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.version.outputs.version }}
@@ -92,8 +92,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 输出信息
+    - name: Output info
       run: |
-        echo "🎉 Release ${{ steps.version.outputs.version }} 已创建！"
-        echo "📋 Release 页面: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
-        echo "⏰ 等待 Make 命令上传发布包..." 
+        echo "🎉 Release ${{ steps.version.outputs.version }} created successfully!"
+        echo "📋 Release page: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
+        echo "⏰ Waiting for Make command to upload release assets..." 
