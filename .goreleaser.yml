@@ -1,6 +1,8 @@
-# GoReleaser配置文件
-# 用于专业化的发布流程，可选使用
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# GoReleaser配置文件 - v2版本
 # 使用方法: goreleaser release --clean
+
+version: 2
 
 project_name: burndevice
 
@@ -33,24 +35,21 @@ builds:
       - -s -w
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X main.date={{.CommitDate}}  # 使用 CommitDate 而不是 Date 以实现可重现构建
     flags:
       - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"  # 可重现构建
 
-# 打包配置
+# 打包配置 - 符合 v2 规范
 archives:
-  - id: burndevice
-    builds:
-      - burndevice
+  - id: default
     name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
       - LICENSE
       - README.md
       - CHANGELOG.md
       - config.example.yaml
+    wrap_in_directory: false
 
 # 校验和
 checksum:
@@ -59,7 +58,7 @@ checksum:
 
 # 快照版本配置
 snapshot:
-  name_template: "{{ .Version }}-SNAPSHOT-{{ .ShortCommit }}"
+  version_template: "{{ .Version }}-SNAPSHOT-{{ .ShortCommit }}"
 
 # 变更日志配置
 changelog:
@@ -105,7 +104,7 @@ dockers:
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
       - "--label=org.opencontainers.image.description=🔥 Device destructive testing tool"
       - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.created={{ .CommitDate }}"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
       - "--label=org.opencontainers.image.licenses=MIT"
 
@@ -117,4 +116,4 @@ release:
   name_template: "🔥 BurnDevice {{ .Version }}"
   prerelease: auto
   mode: replace
-  draft: false 
+  draft: false
