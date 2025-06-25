@@ -39,45 +39,60 @@ jobs:
         
         echo "## 🔥 BurnDevice $VERSION" > CHANGELOG.tmp
         echo "" >> CHANGELOG.tmp
-        echo "### 📈 改进" >> CHANGELOG.tmp
+        echo "### What's New" >> CHANGELOG.tmp
         
         if [ -n "$PREV_TAG" ]; then
-          echo "**完整更新日志**: [\`$PREV_TAG...$VERSION\`](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION)" >> CHANGELOG.tmp
+          echo "**Full Changelog**: [\`$PREV_TAG...$VERSION\`](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION)" >> CHANGELOG.tmp
           echo "" >> CHANGELOG.tmp
-          echo "### 🔄 提交记录" >> CHANGELOG.tmp
+          echo "### Changes" >> CHANGELOG.tmp
           git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> CHANGELOG.tmp
         else
-          echo "- 🎉 首次发布" >> CHANGELOG.tmp
-          echo "- ⚡ 高性能设备烧录工具" >> CHANGELOG.tmp
-          echo "- 🔧 支持多种设备类型" >> CHANGELOG.tmp
-          echo "- 🌐 gRPC API 支持" >> CHANGELOG.tmp
-          echo "- 🤖 AI 辅助功能" >> CHANGELOG.tmp
+          echo "- 🎉 Initial release of BurnDevice" >> CHANGELOG.tmp
+          echo "- ⚡ High-performance device burning tool" >> CHANGELOG.tmp
+          echo "- 🔧 Support for multiple device types" >> CHANGELOG.tmp
+          echo "- 🌐 gRPC API support" >> CHANGELOG.tmp
+          echo "- 🤖 AI-powered destruction scenarios" >> CHANGELOG.tmp
+          echo "- 🛡️ Safety controls and validation" >> CHANGELOG.tmp
         fi
         
         echo "" >> CHANGELOG.tmp
-        echo "### 📦 安装方式" >> CHANGELOG.tmp
+        echo "### 📦 Installation" >> CHANGELOG.tmp
         echo "" >> CHANGELOG.tmp
-        echo "#### 直接下载" >> CHANGELOG.tmp
-        echo "从下方 Assets 下载对应平台的二进制文件" >> CHANGELOG.tmp
+        echo "#### Download Binary" >> CHANGELOG.tmp
+        echo "Download the appropriate binary for your platform from the Assets below." >> CHANGELOG.tmp
         echo "" >> CHANGELOG.tmp
-        echo "#### 使用脚本安装" >> CHANGELOG.tmp
+        echo "#### Build from Source" >> CHANGELOG.tmp
         echo "\`\`\`bash" >> CHANGELOG.tmp
-        echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash" >> CHANGELOG.tmp
+        echo "git clone https://github.com/${{ github.repository }}.git" >> CHANGELOG.tmp
+        echo "cd BurnDevice" >> CHANGELOG.tmp
+        echo "nix develop  # or ensure Go 1.24+ is installed" >> CHANGELOG.tmp
+        echo "make build" >> CHANGELOG.tmp
         echo "\`\`\`" >> CHANGELOG.tmp
         echo "" >> CHANGELOG.tmp
         echo "#### Docker" >> CHANGELOG.tmp
         echo "\`\`\`bash" >> CHANGELOG.tmp
-        echo "docker run --rm -it burndevice/burndevice:${{ steps.version.outputs.version_number }}" >> CHANGELOG.tmp
+        echo "docker run --rm -it ghcr.io/burndevice/burndevice:${{ steps.version.outputs.version_number }}" >> CHANGELOG.tmp
         echo "\`\`\`" >> CHANGELOG.tmp
         echo "" >> CHANGELOG.tmp
-        echo "### 🔍 验证安装" >> CHANGELOG.tmp
+        echo "### 🚀 Quick Start" >> CHANGELOG.tmp
         echo "\`\`\`bash" >> CHANGELOG.tmp
-        echo "burndevice --version" >> CHANGELOG.tmp
+        echo "# Check version" >> CHANGELOG.tmp
+        echo "./burndevice --version" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "# Start server" >> CHANGELOG.tmp
+        echo "./burndevice server --config config.yaml" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "# Run client" >> CHANGELOG.tmp
+        echo "./burndevice client --help" >> CHANGELOG.tmp
         echo "\`\`\`" >> CHANGELOG.tmp
+        echo "" >> CHANGELOG.tmp
+        echo "### ⚠️ Important Notice" >> CHANGELOG.tmp
+        echo "**This tool is intended for authorized testing environments only.**" >> CHANGELOG.tmp
+        echo "Do not use in production systems without proper authorization." >> CHANGELOG.tmp
         echo "" >> CHANGELOG.tmp
         echo "---" >> CHANGELOG.tmp
         echo "" >> CHANGELOG.tmp
-        echo "**注意**: 发布包正在上传中，请稍等片刻..." >> CHANGELOG.tmp
+        echo "📋 For detailed documentation, see [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)" >> CHANGELOG.tmp
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
