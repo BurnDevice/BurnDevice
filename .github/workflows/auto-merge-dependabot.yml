@@ -23,7 +23,7 @@ jobs:
     steps:
     - name: 🔍 Find associated PR
       id: find-pr
-      uses: actions/github-script@v7
+      uses: actions/github-script@v8
       with:
         script: |
           const head_sha = context.payload.workflow_run.head_sha;
@@ -84,7 +84,7 @@ jobs:
     - name: ✅ Verify PR is ready to merge
       id: check-mergeable
       if: steps.find-pr.outputs.result && fromJSON(steps.find-pr.outputs.result).found
-      uses: actions/github-script@v7
+      uses: actions/github-script@v8
       with:
         script: |
           const pr_info = JSON.parse(`${{ steps.find-pr.outputs.result }}`);
