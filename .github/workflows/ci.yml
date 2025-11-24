@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup Go
       uses: actions/setup-go@v6
@@ -81,7 +81,7 @@ jobs:
       security-events: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup Go
       uses: actions/setup-go@v6
@@ -108,7 +108,7 @@ jobs:
         go-version: ['1.23', '1.24']
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup Go
       uses: actions/setup-go@v6
@@ -174,7 +174,7 @@ jobs:
             goarch: arm64
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup Go
       uses: actions/setup-go@v6
@@ -241,7 +241,7 @@ jobs:
     if: github.event_name == 'push'
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -282,7 +282,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Setup Go
       uses: actions/setup-go@v6
